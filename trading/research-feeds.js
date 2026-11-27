@@ -96,7 +96,7 @@ export function normaliseVerifiedNews(payload, now = Date.now()) {
 export function analyseSectorBreadth(quotes = {}, sectorMap = {}) {
   const groups = {};
   for (const [key, sector] of Object.entries(sectorMap)) {
-    const q=quotes[key]; if(!q) continue;
+    const q=quotes[key] || Object.values(quotes).find(item=>item?.instrument_token===key); if(!q) continue;
     const change=finite(q.net_change ?? (finite(q.last_price)!=null&&finite(q.ohlc?.close)!=null?Number(q.last_price)-Number(q.ohlc.close):null));
     if(change===null) continue;
     (groups[sector] ||= []).push(change);
