@@ -121,5 +121,21 @@ app.get("/api/option-chain", async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }); }
 });
 
+app.get("/api/candles", async (req, res) => {
+  if (!accessToken) return res.status(401).json({ error: "Upstox connect karein; demo candles nahi dikhaye ja rahe." });
+  const instrumentKey=String(req.query.instrument_key||"NSE_INDEX|Nifty 50");
+  const allowed=new Set(["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank","NSE_INDEX|India VIX"]);
+  const unit=String(req.query.unit||"minutes"), interval=String(req.query.interval||"5");
+  if(!allowed.has(instrumentKey)) return res.status(400).json({error:"Is build mein NIFTY, BANK NIFTY aur INDIA VIX supported hain."});
+  if(!((unit==="minutes" && /^(1|2|3|5|10|15|30)$/.test(interval)) || (unit==="hours" && /^(1|2|3|4|5)$/.test(interval)) || (unit==="days" && interval==="1"))) return res.status(400).json({error:"Unsupported candle timeframe."});
+  try {
+    const intraday=String(req.query.range||"today")==="today";
+    const url=intraday
+      ? new URL("https://api.upstox.com/v3/historical-candle/intraday/"+encodeURIComponent(instrumentKey)+"/"+unit+"/"+interval)
+      : new URL("https://api.upstox.com/v3/historical-candle/"+encodeURIComponent(instrumentKey)+"/"+unit+"/"+interval+"/"+String(req.query.to_date||new Date().toISOString().slice(0,10))+"/"+String(req.query.from_date||new Date(Date.now()-7*86400000).toISOString().slice(0,10)));
+    const response=await fetch(url,{headers:{accept:"application/json",Authorization:"Bearer "+accessToken}});
+    const data=await response.json();res.status(response.status).json(data);
+  } catch(e){res.status(502).json({error:e.message});}
+});
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
 app.listen(PORT, () => console.log(`Trading Intelligence AI running on port ${PORT}`));
