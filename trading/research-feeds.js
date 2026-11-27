@@ -38,6 +38,17 @@ export function analyseOhlcvStructure(rows, options = {}) {
   if(priorLow && last.close<priorLow.price) events.push({type:"BOS",direction:"bearish",level:priorLow.price,confirmedBy:"candle_close"});
   if(events.some(e=>e.direction==="bullish") && bias==="bearish") events.push({type:"CHoCH",direction:"bullish",level:priorHigh.price,confirmedBy:"candle_close"});
   if(events.some(e=>e.direction==="bearish") && bias==="bullish") events.push({type:"CHoCH",direction:"bearish",level:priorLow.price,confirmedBy:"candle_close"});
+  const sweeps=[];
+  if(priorHigh && last.high>priorHigh.price && last.close<=priorHigh.price) sweeps.push({type:"buy_side_liquidity_sweep",level:priorHigh.price,wickHigh:last.high,close:last.close,timestamp:last.timestamp});
+  if(priorLow && last.low<priorLow.price && last.close>=priorLow.price) sweeps.push({type:"sell_side_liquidity_sweep",level:priorLow.price,wickLow:last.low,close:last.close,timestamp:last.timestamp});
+  const orderBlocks=[];
+  for(const event of events.filter(x=>x.type==="BOS")){
+    const start=Math.max(0,candles.length-12);
+    for(let i=candles.length-2;i>=start;i--){
+      const c=candles[i], opposing=event.direction==="bullish"?c.close<c.open:c.close>c.open;
+      if(opposing){orderBlocks.push({type:event.direction==="bullish"?"bullish_order_block_candidate":"bearish_order_block_candidate",low:c.low,high:c.high,sourceTimestamp:c.timestamp,confirmedBy:"subsequent_close_break"});break;}
+    }
+  }
   const gaps=[];
   for(let i=2;i<candles.length;i++){
     const a=candles[i-2], c=candles[i];
@@ -47,10 +58,10 @@ export function analyseOhlcvStructure(rows, options = {}) {
   const avgVolume=candles.slice(-21,-1).reduce((s,c)=>s+(c.volume||0),0)/Math.max(1,candles.slice(-21,-1).length);
   const volumeRatio=avgVolume>0&&last.volume!=null?Number((last.volume/avgVolume).toFixed(2)):null;
   return {status:"available",candleCount:candles.length,timeframe:options.timeframe||null,lastCandleAt:last.timestamp,bias,
-    events,levels:{lastSwingHigh:priorHigh?.price??null,lastSwingLow:priorLow?.price??null},
+    events,liquiditySweeps:sweeps,orderBlocks:orderBlocks.slice(-5),levels:{lastSwingHigh:priorHigh?.price??null,lastSwingLow:priorLow?.price??null},
     fairValueGaps:gaps.slice(-8),volumeRatio,volumeConfirmed:volumeRatio==null?null:volumeRatio>=1.5,
     evidence:["Structure derived from "+candles.length+" OHLCV candles.","Swing pivots use "+(options.pivotLeft||2)+" bars left and "+(options.pivotRight||2)+" bars right.","BOS/CHoCH require a candle close beyond the latest confirmed swing."],
-    limitations:["FVG is a three-candle price-gap heuristic, not proof of institutional order flow.","Order blocks and liquidity sweeps are not promoted to signals without separate validation.","Latest unfinished candle may change until its interval closes."]};
+    limitations:["FVG is a three-candle price-gap heuristic, not proof of institutional order flow.","Order blocks are last-opposing-candle candidates before a close-confirmed break; sweeps require wick-through and close-back-inside. Both are heuristics, not proof of institutional orders.","Latest unfinished candle may change until its interval closes."]};
 }
 
 export function analyseMarketBreadth(quotes = {}) {
