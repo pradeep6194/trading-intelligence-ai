@@ -241,7 +241,7 @@ async function refreshAutopilotPositions() {
       }
       if (bid > 0) {
         const result = markOptionsPaper(position.instrumentKey, bid);
-        if (result.closed && result.trade) updateAutopilotTrade(result.trade.id, { status: result.trade.status, exit: result.trade.exit, pnl: result.trade.pnl, closedAt: result.trade.closedAt });
+        if (result.closed && result.trade) updateAutopilotTrade(result.trade.id, { status: result.trade.status, exit: result.trade.exit, pnl: result.trade.pnl, closedAt: result.trade.closedAt, outcomeReason: result.trade.status === "stopped" ? "Live bid touched the 25% premium stop." : "Live bid touched the 50% premium target." });
       }
     } catch (error) { console.error("Autopilot position refresh failed:", error.message); }
   }
