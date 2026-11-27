@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 import protobuf from "protobufjs";
+import { gunzipSync } from "node:zlib";
 
 dotenv.config();
 const app = express();
@@ -187,7 +188,30 @@ const DEFAULT_PAPER_UNDERLYINGS = [
   "NSE_EQ|INFY", "NSE_EQ|TCS", "NSE_EQ|AXISBANK", "NSE_EQ|LT",
   "NSE_EQ|BHARTIARTL", "NSE_EQ|TATAMOTORS"
 ];
-const PAPER_UNDERLYINGS = (process.env.PAPER_SCAN_UNDERLYINGS || DEFAULT_PAPER_UNDERLYINGS.join(",")).split(",").map(x => x.trim()).filter(validateUnderlyingKey);
+const customPaperUniverse = process.env.PAPER_SCAN_UNDERLYINGS;
+let PAPER_UNDERLYINGS = (customPaperUniverse || DEFAULT_PAPER_UNDERLYINGS.join(",")).split(",").map(x => x.trim()).filter(validateUnderlyingKey);
+let paperUniverseLoaded = Boolean(customPaperUniverse), scanCursor = 0;
+const PAPER_BATCH_SIZE = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 20));
+async function loadPaperUniverse() {
+  if (paperUniverseLoaded) return;
+  try {
+    const response = await fetch("https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz");
+    if (!response.ok) throw new Error("Upstox NSE instrument master returned " + response.status);
+    const compressed = Buffer.from(await response.arrayBuffer());
+    const instruments = JSON.parse(gunzipSync(compressed).toString("utf8"));
+    const keys = new Set();
+    for (const item of instruments) {
+      if (item.segment === "NSE_FO" && ["CE", "PE"].includes(item.instrument_type) &&
+          ["EQUITY", "INDEX"].includes(item.underlying_type) && validateUnderlyingKey(item.underlying_key)) keys.add(item.underlying_key);
+    }
+    if (keys.size) PAPER_UNDERLYINGS = [...new Set([...DEFAULT_PAPER_UNDERLYINGS.slice(0, 2), ...keys])];
+    paperUniverseLoaded = true;
+    console.log("Loaded NSE F&O option underlyings:", PAPER_UNDERLYINGS.length);
+  } catch (error) {
+    paperUniverseLoaded = true;
+    console.error("Could not load full NSE F&O universe; using fallback shortlist:", error.message);
+  }
+}
 const PAPER_SCAN_INTERVAL_MS = Math.max(60000, Number(process.env.PAPER_SCAN_INTERVAL_MS || 300000));
 let autopilotBusy = false;
 
@@ -231,9 +255,12 @@ async function runAutopilotCycle() {
   autopilotBusy = true;
   try {
     await refreshAutopilotPositions();
+    await loadPaperUniverse();
     const day = indiaDateKey(), filters = { minVolume: 1000, minOi: 10000, maxSpreadPct: 3.5, maxDistancePct: 5 };
+    const batch = PAPER_UNDERLYINGS.length <= PAPER_BATCH_SIZE ? PAPER_UNDERLYINGS : Array.from({ length: PAPER_BATCH_SIZE }, (_, i) => PAPER_UNDERLYINGS[(scanCursor + i) % PAPER_UNDERLYINGS.length]);
+    scanCursor = (scanCursor + batch.length) % Math.max(1, PAPER_UNDERLYINGS.length);
     const best = [];
-    for (const underlyingKey of PAPER_UNDERLYINGS) {
+    for (const underlyingKey of batch) {
       try {
         const scan = await getRankedOptionScan(underlyingKey, undefined, filters);
         const top = scan.candidates[0] || null;
@@ -270,7 +297,7 @@ async function runAutopilotCycle() {
     console.error("90-day paper cycle failed:", error.message);
   } finally { autopilotBusy = false; }
 }
-app.get("/api/autopilot/status", (_req, res) => res.json({ ...getAutopilotStatus(), authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : accessToken ? "session_token" : "disconnected", watchlist: PAPER_UNDERLYINGS, scanIntervalMs: PAPER_SCAN_INTERVAL_MS }));
+app.get("/api/autopilot/status", (_req, res) => res.json({ ...getAutopilotStatus(), authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : accessToken ? "session_token" : "disconnected", watchlist: PAPER_UNDERLYINGS, watchlistCount: PAPER_UNDERLYINGS.length, batchSize: PAPER_BATCH_SIZE, scanIntervalMs: PAPER_SCAN_INTERVAL_MS }));
 app.post("/api/autopilot/start", (_req, res) => {
   if (!accessToken) return res.status(401).json({ error: "Set UPSTOX_ANALYTICS_TOKEN in server environment first. The Analytics Token is read-only and supports market data." });
   res.json(startAutopilot());
