@@ -149,6 +149,96 @@ app.get("/api/candles", async (req, res) => {
 });
 
 import { analyseMarket, autoPaperTrade, markPaperPosition, paperStatus } from "./trading/engine.js";
+import { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper, optionsPaperStatus } from "./trading/options-paper.js";
+
+async function upstoxJson(url) {
+  const response = await fetch(url, { headers: { accept: "application/json", Authorization: "Bearer " + accessToken } });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data?.errors?.[0]?.message || data?.message || ("Upstox API returned " + response.status));
+  return data;
+}
+function validateUnderlyingKey(key) {
+  return /^(NSE_INDEX\|[A-Za-z0-9 .&-]+|NSE_EQ\|[A-Z0-9]+)$/.test(String(key || ""));
+}
+async function getRankedOptionScan(underlyingKey, requestedExpiry, filters = {}) {
+  if (!accessToken) throw new Error("Connect Upstox before scanning option chains.");
+  if (!validateUnderlyingKey(underlyingKey)) throw new Error("Select an NSE index or NSE equity underlying.");
+  const contractUrl = new URL("https://api.upstox.com/v2/option/contract");
+  contractUrl.searchParams.set("instrument_key", underlyingKey);
+  const contractPayload = await upstoxJson(contractUrl);
+  const contracts = contractPayload.data || [];
+  const today = new Date().toISOString().slice(0,10);
+  const expiries = [...new Set(contracts.map(c => c.expiry).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x) && x >= today))].sort();
+  const expiry = requestedExpiry || expiries[0];
+  if (!expiry || !expiries.includes(expiry)) throw new Error("No valid upcoming expiry found. Select a listed expiry.");
+  const chainUrl = new URL("https://api.upstox.com/v2/option/chain");
+  chainUrl.searchParams.set("instrument_key", underlyingKey);
+  chainUrl.searchParams.set("expiry_date", expiry);
+  const chainPayload = await upstoxJson(chainUrl);
+  const rows = chainPayload.data || [];
+  const ranked = rankOptionChain(rows, contracts.filter(c => c.expiry === expiry), filters);
+  return { underlyingKey, expiry, expiries, spot: Number(rows[0]?.underlying_spot_price || 0), pcr: rows[0]?.pcr ?? null, ...ranked, scannedAt: Date.now() };
+}
+app.get("/api/options/search", async (req, res) => {
+  if (!accessToken) return res.status(401).json({ error: "Connect Upstox first." });
+  const query = String(req.query.q || "").trim().slice(0,50);
+  if (query.length < 2) return res.status(400).json({ error: "Enter at least two letters of a stock/index symbol." });
+  try {
+    const url = new URL("https://api.upstox.com/v2/instruments/search");
+    url.searchParams.set("query", query); url.searchParams.set("exchanges", "NSE"); url.searchParams.set("segments", "FO");
+    url.searchParams.set("instrument_types", "CE,PE"); url.searchParams.set("expiry", "current_month");
+    url.searchParams.set("page_number", "1"); url.searchParams.set("records", "30");
+    const payload = await upstoxJson(url);
+    const unique = new Map();
+    for (const item of payload.data || []) if (item.underlying_key && validateUnderlyingKey(item.underlying_key)) {
+      unique.set(item.underlying_key, { instrumentKey: item.underlying_key, symbol: item.underlying_symbol || item.trading_symbol, name: item.name, underlyingType: item.underlying_type });
+    }
+    res.json({ results: [...unique.values()] });
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+app.get("/api/options/scan", async (req, res) => {
+  try {
+    const filters = { minVolume: Number(req.query.min_volume || 100), minOi: Number(req.query.min_oi || 500), maxSpreadPct: Number(req.query.max_spread_pct || 8), maxDistancePct: Number(req.query.max_distance_pct || 5) };
+    const result = await getRankedOptionScan(String(req.query.instrument_key || ""), String(req.query.expiry_date || "") || undefined, filters);
+    res.json(result);
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.get("/api/options/paper/status", (_req, res) => res.json(optionsPaperStatus()));
+app.post("/api/options/paper/enter", async (req, res) => {
+  try {
+    const filters = req.body?.filters || {};
+    const scan = await getRankedOptionScan(String(req.body?.underlyingKey || ""), String(req.body?.expiry || ""), filters);
+    const candidate = scan.candidates.find(c => c.instrumentKey === req.body?.instrumentKey);
+    if (!candidate) return res.status(409).json({ error: "Selected contract is no longer in the fresh scan. Scan again." });
+    res.json(openOptionsPaper(candidate));
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/options/paper/refresh", async (_req, res) => {
+  const status = optionsPaperStatus();
+  const updates = [];
+  for (const position of status.openPositions) {
+    try {
+      const url = new URL("https://api.upstox.com/v2/option/chain");
+      url.searchParams.set("instrument_key", position.underlyingKey);
+      url.searchParams.set("expiry_date", position.expiry);
+      const payload = await upstoxJson(url);
+      let liveBid = null;
+      for (const row of payload.data || []) {
+        for (const side of ["call_options", "put_options"]) {
+          const opt = row[side];
+          if (opt?.instrument_key === position.instrumentKey) liveBid = Number(opt.market_data?.bid_price);
+        }
+      }
+      if (liveBid > 0) updates.push(markOptionsPaper(position.instrumentKey, liveBid));
+      else updates.push({ updated: false, instrumentKey: position.instrumentKey, error: "Live bid unavailable in option chain." });
+    } catch (e) { updates.push({ updated: false, instrumentKey: position.instrumentKey, error: e.message }); }
+  }
+  res.json({ updates, status: optionsPaperStatus() });
+});
+app.post("/api/options/paper/close", (req, res) => {
+  try { res.json(closeOptionsPaper(String(req.body?.instrumentKey || ""), Number(req.body?.bidPrice))); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
 
 // Paper-only trading API. No broker order placement is exposed.
 app.get("/api/trading/status", (_req, res) => res.json(paperStatus()));
