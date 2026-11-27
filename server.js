@@ -217,9 +217,19 @@ app.post("/api/options/paper/refresh", async (_req, res) => {
   const updates = [];
   for (const position of status.openPositions) {
     try {
-      const scan = await getRankedOptionScan(position.underlyingKey, position.expiry);
-      const candidate = scan.candidates.find(c => c.instrumentKey === position.instrumentKey);
-      if (candidate) updates.push(markOptionsPaper(position.instrumentKey, candidate.bid));
+      const url = new URL("https://api.upstox.com/v2/option/chain");
+      url.searchParams.set("instrument_key", position.underlyingKey);
+      url.searchParams.set("expiry_date", position.expiry);
+      const payload = await upstoxJson(url);
+      let liveBid = null;
+      for (const row of payload.data || []) {
+        for (const side of ["call_options", "put_options"]) {
+          const opt = row[side];
+          if (opt?.instrument_key === position.instrumentKey) liveBid = Number(opt.market_data?.bid_price);
+        }
+      }
+      if (liveBid > 0) updates.push(markOptionsPaper(position.instrumentKey, liveBid));
+      else updates.push({ updated: false, instrumentKey: position.instrumentKey, error: "Live bid unavailable in option chain." });
     } catch (e) { updates.push({ updated: false, instrumentKey: position.instrumentKey, error: e.message }); }
   }
   res.json({ updates, status: optionsPaperStatus() });
