@@ -130,6 +130,7 @@ try {
         const outcome = resolveForwardOutcome(priorObservation, result.spot);
         if (outcome) priorObservation.forwardOutcome = outcome;
       }
+      fs.writeFileSync(dataFile, JSON.stringify(stored), { mode: 0o600 });
       const observation = {
         at: Date.now(), underlyingKey, symbol: top?.symbol || null, score: top?.volatilityScore ?? null,
         changePct: top?.changePct ?? null, iv: top?.iv ?? null, volume: top?.volume ?? null,
