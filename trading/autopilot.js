@@ -45,6 +45,9 @@ export function recordScan(scan) {
 export function recordAutopilotTrade(trade) {
   updateAutopilot(a => { a.trades.push(trade); if (a.trades.length > 2000) a.trades.shift(); });
 }
+export function updateAutopilotTrade(id, patch) {
+  updateAutopilot(a => { const trade = a.trades.find(t => t.id === id); if (trade) Object.assign(trade, patch); });
+}
 export function recordAutopilotError(message) {
   updateAutopilot(a => { a.lastError = String(message).slice(0, 500); });
 }
