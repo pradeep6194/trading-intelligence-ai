@@ -70,16 +70,17 @@ const btFmt=n=>Number(n).toLocaleString("en-IN",{maximumFractionDigits:2});
 function btEma(values,p){const k=2/(p+1);let v=values[0];return values.map((x,i)=>{if(i)v=x*k+v*(1-k);return v;});}
 function drawBt(values){const c=$("#btChart");if(!c)return;const w=c.clientWidth||600,h=220,dpr=window.devicePixelRatio||1;c.width=w*dpr;c.height=h*dpr;const g=c.getContext("2d");g.scale(dpr,dpr);g.clearRect(0,0,w,h);if(!values.length)return;let lo=Math.min(0,...values),hi=Math.max(0,...values);if(hi===lo)hi=lo+1;const y=v=>h-14-(v-lo)/(hi-lo)*(h-28);g.strokeStyle="#53647c";g.lineWidth=1;g.beginPath();g.moveTo(8,y(0));g.lineTo(w-8,y(0));g.stroke();g.strokeStyle="#e6bd72";g.lineWidth=2;g.beginPath();values.forEach((v,i)=>{const x=8+i*(w-16)/Math.max(1,values.length-1);i?g.lineTo(x,y(v)):g.moveTo(x,y(v));});g.stroke();}
 async function runBacktest(){
- const msg=$("#btMessage");msg.textContent="Upstox se historical candles fetch ho rahe hain…";
+ const msg=$("#btMessage");if(msg)msg.textContent="Upstox se historical candles fetch ho rahe hain…";
  try{
-  const from=$("#btFrom").value,to=$("#btTo").value,fast=Number($("#btFast").value),slow=Number($("#btSlow").value);
-  const qty=Number($("#btQty").value),fixedCost=Number($("#btFixedCost").value),direction=$("#btDirection").value;
+  const read=id=>{const el=document.getElementById(id);if(!el)throw Error("Backtesting form field missing: "+id+". Page refresh karein.");return el.value;};
+  const from=read("btFrom"),to=read("btTo"),fast=Number(read("btFast")),slow=Number(read("btSlow"));
+  const qty=Number(read("btQty")),fixedCost=Number(read("btFixedCost")),direction=read("btDirection");
   if(!from||!to||from>to)throw Error("Valid From aur To dates select karein.");
   if(fast<2||slow<=fast)throw Error("Slow EMA, Fast EMA se bada hona chahiye.");
   if(!Number.isFinite(qty)||qty<1||!Number.isInteger(qty))throw Error("Quantity / units kam se kam 1 aur whole number honi chahiye.");
   if(!Number.isFinite(fixedCost)||fixedCost<0)throw Error("Per-trade charges zero ya usse zyada hone chahiye.");
-  const [unit,interval]=$("#btInterval").value.split("|");
-  const params=new URLSearchParams({instrument_key:$("#btInstrument").value,unit,interval,range:"custom",from_date:from,to_date:to});
+  const [unit,interval]=read("btInterval").split("|");
+  const params=new URLSearchParams({instrument_key:read("btInstrument"),unit,interval,range:"custom",from_date:from,to_date:to});
   const response=await fetch("/api/candles?"+params),payload=await response.json();if(!response.ok)throw Error(payload.error||"Historical candle request failed.");
   const raw=payload.data?.candles||[],candles=raw.slice().reverse().filter(x=>x.length>=5&&Number.isFinite(Number(x[1]))&&Number.isFinite(Number(x[4])));
   if(candles.length<slow+3)throw Error("Is date range mein enough candles nahi hain. Range badhayein ya slower EMA kam karein.");
@@ -112,7 +113,7 @@ async function runBacktest(){
   $("#btCountLabel").textContent=trades.length+" CLOSED TRADES";drawBt(curve);
   msg.textContent="Verified Upstox historical candles · "+candles.length+" candles · "+from+" to "+to+". Rupee P&L uses "+qty+" unit(s); ₹"+fixedCost+" estimated round-trip charges per completed trade. Taxes/slippage may vary.";
  }catch(e){
-  msg.textContent=e.message;$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';
+  if(msg)msg.textContent=e.message+" ["+(e.stack||"").split("\\n")[1]?.trim()+"]";$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';
   ["btNet","btWin","btTrades","btPf","btDd","btAvg","btAvgWin","btAvgLoss","btExpectancy","btCharges"].forEach(id=>{if($("#"+id))$("#"+id).textContent="—";});drawBt([]);
  }
 }
