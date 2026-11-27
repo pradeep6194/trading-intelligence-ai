@@ -102,5 +102,24 @@ app.get("/api/quotes", async (req, res) => {
   try { const url = new URL("https://api.upstox.com/v3/market-quote/quotes"); url.searchParams.set("instrument_key", keys.join(",")); const response = await fetch(url, { headers: { accept: "application/json", Authorization: `Bearer ${accessToken}` } }); res.status(response.status).json(await response.json()); }
   catch (e) { res.status(502).json({ error: e.message }); }
 });
+
+app.get("/api/option-chain", async (req, res) => {
+  if (!accessToken) return res.status(401).json({ error: "Upstox not connected. Connect Upstox first." });
+  const allowed = new Set(["NSE_INDEX|Nifty 50", "NSE_INDEX|Nifty Bank"]);
+  const instrumentKey = String(req.query.instrument_key || "NSE_INDEX|Nifty 50");
+  const expiryDate = String(req.query.expiry_date || "current_week");
+  const validExpiry = /^(current_week|next_week|far_week|current_month|next_month|far_month|\d{4}-\d{2}-\d{2})$/.test(expiryDate);
+  if (!allowed.has(instrumentKey)) return res.status(400).json({ error: "Only NIFTY 50 and BANK NIFTY are supported by this option-chain endpoint." });
+  if (!validExpiry) return res.status(400).json({ error: "Expiry must be YYYY-MM-DD or a supported relative keyword." });
+  try {
+    const url = new URL("https://api.upstox.com/v2/option/chain");
+    url.searchParams.set("instrument_key", instrumentKey);
+    url.searchParams.set("expiry_date", expiryDate);
+    const response = await fetch(url, { headers: { accept: "application/json", Authorization: `Bearer ${accessToken}` } });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (e) { res.status(502).json({ error: e.message }); }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
 app.listen(PORT, () => console.log(`Trading Intelligence AI running on port ${PORT}`));
