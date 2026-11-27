@@ -41,14 +41,18 @@ export function evaluateIntelligenceSuite(input={}) {
     br?.status==="available"?"Sampled breadth "+br.bias+": "+br.advances+" advances / "+br.declines+" declines from "+br.sampleSize+" instruments.":"Market breadth quote sample unavailable.",
     br?.status==="available"?["A/D ratio "+(br.advanceDeclineRatio??"undefined"),"Breadth differential "+br.breadthPct+"%"]:[],
     [...(br?.limitations||["No quote rows available."]),...(br?.coverage?.successfulQuoteChunks<br?.coverage?.totalQuoteChunks?["Only "+br.coverage.successfulQuoteChunks+"/"+br.coverage.totalQuoteChunks+" quote chunks succeeded."]:[])]);
-  const newsItems=research.news||[];\n  const exchangeNews=research.exchangeAnnouncements||[];
-  const news=module("news_events","News and event intelligence",newsItems.length?"available":"unavailable",null,
-    newsItems.length?newsItems.length+" timestamped Upstox News API items verified against provider article links.":"No verified instrument news returned in the latest request.",
-    newsItems.slice(0,5).map(x=>x.headline+" ("+x.instrumentKey+")"),
-    ["News endpoint covers the past seven days and only requested instruments.","Provider publication and link provenance are checked; headlines are not treated as confirmed causal catalysts."]);
-  const pattern=module("pattern_discovery","Historical pattern discovery",observations.length>=20?"research_ready":"insufficient_history",null,
-    observations.length>=20?"Historical observations are available for later regime-conditioned pattern tests.":"Need at least 20 comparable observations; no pattern claim is made yet.",
-    ["Stored observations available: "+observations.length],["A valid pattern requires out-of-sample testing, costs and adequate sample size."]);
+  const newsItems=research.news||[];
+  const exchangeNews=research.exchangeAnnouncements||[];
+  const news=module("news_events","News and event intelligence",newsItems.length||exchangeNews.length?"available":"unavailable",null,
+    newsItems.length||exchangeNews.length?(newsItems.length+" Upstox news items; "+exchangeNews.length+" NSE exchange announcements returned."):"No verified instrument news or official exchange announcements returned.",
+    [...exchangeNews.slice(0,3).map(x=>String(x.symbol||x.sm_name||"NSE filing")+": "+String(x.desc||x.subject||"Announcement")),...newsItems.slice(0,3).map(x=>x.headline+" ("+x.instrumentKey+")")],
+    ["Upstox news covers the past seven days and requested instruments only.","NSE announcements are accepted only from the official NSE endpoint; access may be restricted.","Headlines and filings are not treated as confirmed causal catalysts."]);
+  const backtests=research.backtests||{};
+  const testEvidence=Object.entries(backtests).map(([key,x])=>key+" OOS: "+(x.outOfSample?.trades??0)+" trades, win rate "+(x.outOfSample?.winRatePct??"—")+"%, expectancy "+(x.outOfSample?.expectancyPct??"—")+"%, max DD "+(x.outOfSample?.maxDrawdownPct??"—")+"%.");
+  const patternReady=Object.values(backtests).some(x=>x.status==="research_ready");
+  const pattern=module("pattern_discovery","Historical pattern discovery",patternReady?"research_ready":"insufficient_history",null,
+    patternReady?"Chronological train/test benchmark backtests are available; results are research diagnostics, not proof of edge.":"Waiting for sufficient historical candles and at least ten out-of-sample signals.",
+    ["Stored observations available: "+observations.length,...testEvidence],Object.values(backtests).flatMap(x=>x.limitations||["Backtest not available."]));
   const riskEvidence=["Closed paper trades: "+closed.length,"Wins: "+wins,"Losses: "+losses];
   const risk=module("risk","Risk intelligence", "available",null,
     closed.length?"Paper-trade outcomes are being tracked; detailed portfolio exposure and drawdown require position/equity history.":"Risk controls remain enforced by the existing paper execution engine.",
