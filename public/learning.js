@@ -14,14 +14,16 @@ function render(d){
  $("learnFeed").innerHTML=rows.length?rows.map(x=>{
   const ev=x.evidence||{}, drivers=x.drivers||[];
   return '<article class="learn-event"><div class="learn-event-top"><b>'+esc(x.underlyingKey||x.symbol||"NSE instrument")+'</b><time>'+new Date(x.at||0).toLocaleString("en-IN")+'</time></div>'+
+  '<div class="learn-regime">'+esc(x.regime||"market evidence")+'</div>'+
   '<p>'+esc(x.summary||x.text||"Scan recorded.")+'</p>'+
   (drivers.length?'<div class="learn-drivers">'+drivers.map(v=>'<span>'+esc(v)+'</span>').join("")+'</div>':'')+
   '<div class="learn-metrics">'+
-  '<span>Spot '+num(ev.spot)+'</span><span>Spot Δ '+(ev.spotChangePct==null?"—":num(ev.spotChangePct)+"%")+'</span>'+
-  '<span>PCR '+num(ev.pcr,2)+'</span><span>Call OI '+num(ev.callOi,0)+'</span><span>Put OI '+num(ev.putOi,0)+'</span>'+
+  '<span>Spot '+num(ev.spot)+'</span><span>Spot Δ / 5m '+(ev.spotChangePct==null?"—":num(ev.spotChangePct)+"%")+'</span>'+
+  '<span>PCR '+num(ev.pcr,2)+'</span><span>PCR Δ '+(ev.pcrChange==null?"—":num(ev.pcrChange,2))+'</span>'+
+  '<span>Call OI Δ '+(ev.callOiChangePct==null?"—":num(ev.callOiChangePct)+"%")+'</span><span>Put OI Δ '+(ev.putOiChangePct==null?"—":num(ev.putOiChangePct)+"%")+'</span>'+
   '<span>Top premium Δ '+(x.changePct==null?"—":num(x.changePct)+"%")+'</span><span>IV '+num(x.iv,1)+'</span>'+
   '<span>Volume '+num(x.volume,0)+'</span><span>Score '+num(x.score,0)+'/100</span></div>'+
-  '<small class="learn-note">Observed market evidence, not proof of a causal news event or a guaranteed prediction.</small></article>';
+  '<small class="learn-note">Evidence-based interpretation of price, option positioning and liquidity. This cannot verify a news catalyst or prove causation.</small></article>';
  }).join(""):'<div class="history-empty">No learning observations yet. Start the 90-day paper experiment and the cloud worker will populate this page during NSE market hours.</div>';
  $("learnTradesList").innerHTML=(d.recentTrades||[]).length?d.recentTrades.slice(0,20).map(t=>'<div class="learn-trade"><b>'+esc(t.symbol)+'</b><span>'+esc(t.status)+'</span><span>₹'+num(t.pnl||0)+'</span><small>'+esc((t.reasons||[]).join(" · ")||t.outcomeReason||"No trade rationale recorded")+'</small></div>').join(""):"No paper-trade outcomes yet. The system needs completed observations and trades before it can measure which setups worked.";
  $("learnError").textContent=d.lastError?"Last worker error: "+d.lastError:"";
