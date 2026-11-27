@@ -1,5 +1,5 @@
 // Evidence-first market learning. This module describes observed conditions; it does not claim causation or forecast certainty.
-const n = value => Number.isFinite(Number(value)) ? Number(value) : null;
+const n = value => value == null || value === "" ? null : Number.isFinite(Number(value)) ? Number(value) : null;
 const pct = value => value == null ? null : Number(value.toFixed(3));
 
 export function classifyMarketEvidence(input = {}) {
