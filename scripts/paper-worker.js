@@ -150,7 +150,10 @@ try {
   payload.autopilot.scanCursor = stocks.length ? (start + rotating.length) % stocks.length : 0;
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
-  const day = indiaDate(), best = [];\n  const research = await collectResearch(batch, token, payload.autopilot.latestResearch);\n  payload.autopilot.latestResearch = research;\n  fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
+  const day = indiaDate(), best = [];
+  const research = await collectResearch(batch, token, payload.autopilot.latestResearch);
+  payload.autopilot.latestResearch = research;
+  fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   for (const underlyingKey of batch) {
     try {
       const result = await scanUnderlying(underlyingKey, rankOptionChain);
