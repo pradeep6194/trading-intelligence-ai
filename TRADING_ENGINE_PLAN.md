@@ -24,6 +24,7 @@ Analyze request requires 30–2000 valid candles:
 - 1% daily realized-loss lock.
 - Maximum 3 entries per day.
 - One open position per market.
+- 10x maximum gross notional exposure cap in the generic paper simulator; actual derivatives margin and lot sizing are not modelled yet.
 - 1.5 ATR stop and 2R target.
 These are configurable starter assumptions, not personalized financial advice or guarantees.
 
