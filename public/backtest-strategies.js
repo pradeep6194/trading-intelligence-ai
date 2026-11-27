@@ -12,7 +12,7 @@ for(let i=start;i<c.length-1;i++){let sig=0;if(strategy==="ema"){if(ef[i-1]<=es[
 const desired=sig||pos;if(desired!==pos){const next=c[i+1],px=+next[1];if(pos){const gross=(px-entry)*pos,fees=(Math.abs(px)+Math.abs(entry))*cost/10000;tr.push({side:pos>0?"LONG":"SHORT",entry,exit:px,gross,fees,net:gross-fees,regime:entryRegime});}if(desired){pos=desired;entry=px;entryRegime=regimes[i+1].regime;}else pos=0;}}
 if(pos){const px=+c[c.length-1][4],gross=(px-entry)*pos,fees=(Math.abs(px)+Math.abs(entry))*cost/10000;tr.push({side:pos>0?"LONG":"SHORT",entry,exit:px,gross,fees,net:gross-fees,regime:entryRegime});}return tr;}
 function chart(a){const c=$("#btChart");if(!c)return;const w=c.clientWidth||600,h=220,d=window.devicePixelRatio||1;c.width=w*d;c.height=h*d;const g=c.getContext("2d");g.scale(d,d);g.clearRect(0,0,w,h);if(!a.length)return;let lo=Math.min(0,...a),hi=Math.max(0,...a);if(lo===hi)hi=lo+1;const y=x=>h-14-(x-lo)/(hi-lo)*(h-28);g.strokeStyle="#53647c";g.beginPath();g.moveTo(8,y(0));g.lineTo(w-8,y(0));g.stroke();g.strokeStyle="#e6bd72";g.lineWidth=2;g.beginPath();a.forEach((x,i)=>i?g.lineTo(8+i*(w-16)/(a.length-1),y(x)):g.moveTo(8,y(x)));g.stroke();}
-function row(s,label){return "<tr><td>"+label+"</td><td>"+s.n+"</td><td>"+fmt(s.net)+"</td><td>"+(s.n?s.win.toFixed(1)+"%":"—")+"</td><td>"+(s.pf===Infinity?"∞":s.n?s.pf.toFixed(2):"—")+"</td><td>"+fmt(s.dd)+"</td><td>"+fmt(s.avg)+"</td></tr>";}
+function row(s,label){return "<tr><td>"+label+"</td><td>"+s.n+"</td><td>₹"+fmt(s.net)+"</td><td>"+(s.n?s.win.toFixed(1)+"%":"—")+"</td><td>"+(s.pf===Infinity?"∞":s.n?s.pf.toFixed(2):"—")+"</td><td>₹"+fmt(s.dd)+"</td><td>₹"+fmt(s.avg)+"</td></tr>";}
 async function run(){
 const msg=$("#btMessage"); if(!msg)return;
 const get=id=>{const el=document.getElementById(id);if(!el)throw Error("Backtesting field missing: "+id+". App refresh karein.");return el.value;};
@@ -38,6 +38,8 @@ if(candles.length<Math.max(slow+8,lb+8,30))throw Error("Enough candles nahi hain
 const close=candles.map(x=>+x[4]),slowE=ema(close,slow),atr=atrCalc(candles),regimes=classify(candles,slowE,atr);
 const names={ema:"EMA crossover",confluence:"EMA + VWAP + RSI",sweep:"Liquidity sweep"};
 const all={};Object.keys(names).forEach(k=>all[k]=simulate(candles,fast,slow,cost,dir,k,rl,rs,lb,regimes,qty));
+const compared=Object.keys(names).map(k=>{const z=stats(all[k]);return {key:k,name:names[k],trades:z.n,netPnl:z.net,winRate:z.win,profitFactor:Number.isFinite(z.pf)?z.pf:null,drawdown:z.dd,expectancy:z.avg};});
+try{localStorage.setItem("tia-last-backtest",JSON.stringify({savedAt:new Date().toISOString(),instrument:get("btInstrument"),unit,interval,from,to,selected,quantity:qty,chargesPerTrade:cost,strategies:compared}));}catch(e){console.warn("Could not save backtest snapshot",e);}
 const trades=all[selected],s=stats(trades),curve=[0];let equity=0;trades.forEach(t=>{equity+=t.net;curve.push(equity);});
 const set=(id,v)=>{const el=$("#"+id);if(el)el.textContent=v;};
 set("btNet","₹"+fmt(s.net));set("btWin",s.n?s.win.toFixed(1)+"%":"—");set("btTrades",s.n);
