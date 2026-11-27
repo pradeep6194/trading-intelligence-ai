@@ -160,7 +160,7 @@ async function upstoxJson(url) {
 function validateUnderlyingKey(key) {
   return /^(NSE_INDEX\|[A-Za-z0-9 .&-]+|NSE_EQ\|[A-Z0-9]+)$/.test(String(key || ""));
 }
-async function getRankedOptionScan(underlyingKey, requestedExpiry) {
+async function getRankedOptionScan(underlyingKey, requestedExpiry, filters = {}) {
   if (!accessToken) throw new Error("Connect Upstox before scanning option chains.");
   if (!validateUnderlyingKey(underlyingKey)) throw new Error("Select an NSE index or NSE equity underlying.");
   const contractUrl = new URL("https://api.upstox.com/v2/option/contract");
@@ -176,7 +176,7 @@ async function getRankedOptionScan(underlyingKey, requestedExpiry) {
   chainUrl.searchParams.set("expiry_date", expiry);
   const chainPayload = await upstoxJson(chainUrl);
   const rows = chainPayload.data || [];
-  const ranked = rankOptionChain(rows, contracts.filter(c => c.expiry === expiry));
+  const ranked = rankOptionChain(rows, contracts.filter(c => c.expiry === expiry), filters);
   return { underlyingKey, expiry, expiries, spot: Number(rows[0]?.underlying_spot_price || 0), pcr: rows[0]?.pcr ?? null, ...ranked, scannedAt: Date.now() };
 }
 app.get("/api/options/search", async (req, res) => {
@@ -198,7 +198,8 @@ app.get("/api/options/search", async (req, res) => {
 });
 app.get("/api/options/scan", async (req, res) => {
   try {
-    const result = await getRankedOptionScan(String(req.query.instrument_key || ""), String(req.query.expiry_date || "") || undefined);
+    const filters = { minVolume: Number(req.query.min_volume || 100), minOi: Number(req.query.min_oi || 500), maxSpreadPct: Number(req.query.max_spread_pct || 8), maxDistancePct: Number(req.query.max_distance_pct || 5) };
+    const result = await getRankedOptionScan(String(req.query.instrument_key || ""), String(req.query.expiry_date || "") || undefined, filters);
     res.json(result);
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
