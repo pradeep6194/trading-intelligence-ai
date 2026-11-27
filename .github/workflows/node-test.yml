@@ -1,7 +1,7 @@
 name: Node tests
 on:
   push:
-    branches: [main, feature/options-chain-paper-trading, feature/adaptive-market-learning]
+    branches: [main, feature/options-chain-paper-trading, feature/adaptive-market-learning, feature/integrated-ten-intelligence]
   pull_request:
     branches: [main]
 jobs:

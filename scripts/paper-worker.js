@@ -92,6 +92,7 @@ fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
 const { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper } = await import("../trading/options-paper.js");
 const { recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotError, hasEnteredUnderlyingToday, markUnderlyingEnteredToday } = await import("../trading/autopilot.js");
 const { classifyMarketEvidence, resolveForwardOutcome } = await import("../trading/market-learning.js");
+const { evaluateIntelligenceSuite } = await import("../trading/intelligence-suite.js");
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
@@ -124,6 +125,12 @@ try {
         volume: top?.volume ?? null, spreadPct: top?.spreadPct ?? null
       });
       const drivers = analysis.drivers.map(item => item.observation);
+      const intelligence = evaluateIntelligenceSuite({
+        spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange,
+        callOiChangePct, putOiChangePct, premiumChangePct: top?.changePct ?? null,
+        iv: top?.iv ?? null, volume: top?.volume ?? null, spreadPct: top?.spreadPct ?? null,
+        observations: stored.autopilot.observations || [], trades: stored.autopilot.trades || []
+      });
       const priorObservation = (stored.autopilot.observations || []).slice().reverse()
         .find(item => item.underlyingKey === underlyingKey && item.analysis && !item.forwardOutcome && item.evidence?.spot > 0);
       if (priorObservation) {
@@ -137,7 +144,7 @@ try {
         oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null, regime: analysis.regime,
         spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi,
         evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange, callOi: result.callOi, putOi: result.putOi, callOiChange: result.callOiChange, putOiChange: result.putOiChange, callOiChangePct, putOiChangePct },
-        analysis, drivers, summary: top
+        analysis, intelligence, drivers, summary: top
           ? underlyingKey + ": leading " + top.side + " contract " + top.symbol + " scored " + top.volatilityScore + "/100. Observed premium change " + top.changePct + "%."
           : underlyingKey + ": no option contract passed the configured liquidity filters.",
         text: top ? top.symbol + " · " + drivers.join("; ") : "No liquid candidate for " + underlyingKey + "."
@@ -149,7 +156,7 @@ try {
       afterScan.autopilot.marketSnapshots ||= {};
       afterScan.autopilot.marketSnapshots[underlyingKey] = { at: observation.at, spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi };
       fs.writeFileSync(dataFile, JSON.stringify(afterScan), { mode: 0o600 });
-      if (top) best.push(top);
+      if (top) best.push({ ...top, intelligence });
     } catch (error) {
       recordScan({ at: Date.now(), underlyingKey, error: error.message, candidateCount: 0 });
     }
@@ -166,7 +173,8 @@ try {
         entry: opened.position.entry, quantity: opened.position.quantity, lots: opened.position.lots,
         stop: opened.position.stop, target: opened.position.target, score: candidate.volatilityScore,
         changePct: candidate.changePct, iv: candidate.iv, volume: candidate.volume, oi: candidate.oi, spreadPct: candidate.spreadPct,
-        reasons: ["Relative volatility score >= 70", "Option premium day change >= +3%", "Volume and OI filters passed", "Bid-ask spread <= 3.5%", "One entry per underlying per Indian market day"]
+        reasons: ["Relative volatility score >= 70", "Option premium day change >= +3%", "Volume and OI filters passed", "Bid-ask spread <= 3.5%", "One entry per underlying per Indian market day", "Integrated research snapshot attached; unavailable feeds are explicitly excluded"],
+        intelligence: candidate.intelligence || null
       });
     }
   }
