@@ -17,6 +17,7 @@
   <button class="nav" data-page="options">◈ <span>Options</span></button>
   <button class="nav" data-page="analysis">⌁ <span>Technical Lab</span></button>
   <button class="nav" data-page="backtest">▥ <span>Backtesting</span></button>
+  <button class="nav" data-page="psychology">◎ <span>Psychology Coach</span></button>
   <button class="nav" data-page="paper">◎ <span>Paper Trading</span></button>
   <button class="nav" data-page="risk">◇ <span>Risk Coach</span></button>
   <button class="nav" data-page="journal">▦ <span>Trade Journal</span></button>
@@ -89,10 +90,67 @@
  <article class="panel"><div class="panel-head"><h3>Trade-by-trade results</h3><span class="tag" id="btCountLabel">NOT RUN</span></div><div class="table-scroll"><table class="option-table"><thead><tr><th>#</th><th>Side</th><th>Entry</th><th>Exit</th><th>Gross P&amp;L (₹)</th><th>Charges (₹)</th><th>Net P&amp;L (₹)</th></tr></thead><tbody id="btRows"><tr><td colspan="7" class="history-empty">No backtest run yet.</td></tr></tbody></table></div></article>
  <p class="muted tiny">Method: EMA crossover is confirmed at candle close and entered/exited at the next candle open. Any open position is closed at the final candle close. P&amp;L is converted to rupees using Quantity / units. A fixed estimated ₹ charge is deducted once per completed trade (round trip), and quantity converts index points into rupee P&amp;L. This is a simplified research backtest: actual brokerage, taxes, spread, slippage, futures basis, margin and options payoff may differ. Historical performance does not predict future returns.</p>
 </section>
+
+<section class="page" id="psychology">
+ <div class="section-head"><div><div class="eyebrow">PROCESS BEFORE P&amp;L</div><h3>Trading Psychology Coach</h3><p class="muted">Book-based routines for probability thinking, emotional error diagnosis, accepting risk and deliberate process improvement.</p></div></div>
+ <article class="panel psyche-gate"><div class="panel-head"><div><div class="eyebrow gold">BACKTEST REALITY CHECK</div><h3 id="psyBacktestTitle">No recent backtest saved</h3></div><span class="tag">COST-AWARE</span></div><p id="psyBacktestStatus" class="muted">Run a Backtesting Lab test after this update. The coach will read net results after quantity and fixed round-trip charges.</p></article>
+ <div class="psy-grid">
+  <article class="panel">
+   <div class="eyebrow gold">BEFORE EVERY TRADE</div><h3>Pre-trade discipline gate</h3>
+   <p class="muted tiny">This is a self-check, not a broker lock or a trade signal.</p>
+   <label class="psy-field">Current mental state<select id="psyMood"><option value="calm">Calm and focused</option><option value="fomo">FOMO / fear of missing out</option><option value="revenge">Wanting to recover a loss</option><option value="fear">Fearful / hesitant</option><option value="angry">Angry / frustrated</option><option value="overconfident">Overconfident after a win</option><option value="tired">Tired / distracted</option></select></label>
+   <label class="psy-field">Planned maximum loss for this trade (₹)<input id="psyRisk" type="number" min="1" step="1" placeholder="Enter the full stop-loss risk"></label>
+   <label class="psy-field">Your daily loss limit (₹)<input id="psyDailyLimit" type="number" min="1" step="1" placeholder="Set this before the session"></label>
+   <label class="psy-field">Pause after consecutive losses<input id="psyLossPause" type="number" min="1" max="10" step="1" value="2"></label>
+   <div class="psy-checks">
+    <label><input type="checkbox" id="psyC1"> I can explain the setup and its entry trigger in one sentence.</label>
+    <label><input type="checkbox" id="psyC2"> Entry, invalidation, stop and exit plan are written before entry.</label>
+    <label><input type="checkbox" id="psyC3"> I accept the full planned loss; I will not widen the stop.</label>
+    <label><input type="checkbox" id="psyC4"> Charges and realistic execution costs are included in the tested edge.</label>
+    <label><input type="checkbox" id="psyC5"> This is not revenge, FOMO, boredom or an attempt to win back money.</label>
+    <label><input type="checkbox" id="psyC6"> This trade follows my written rules and daily risk limit.</label>
+   </div>
+   <button class="btn btn-gold full" id="psyCheckBtn">Check my readiness</button>
+   <div class="psy-result" id="psyReadiness" aria-live="polite">Complete the checks before considering a paper trade.</div>
+  </article>
+  <article class="panel">
+   <div class="eyebrow gold">AFTER EVERY TRADE</div><h3>Post-trade review</h3>
+   <p class="muted tiny">A planned loss can still be good execution. A profitable rule-break is still a process mistake.</p>
+   <form id="psyReviewForm" class="psy-form">
+    <label>Outcome<select id="psyOutcome"><option value="win">Win</option><option value="loss">Loss</option><option value="flat">Breakeven</option></select></label>
+    <label>Realised P&amp;L (₹)<input id="psyPnl" type="number" step="0.01" value="0" required></label>
+    <label>Did you follow the plan?<select id="psyFollowed"><option value="yes">Yes — followed the plan</option><option value="no">No — broke at least one rule</option></select></label>
+    <label>Main mistake (choose “None” when no mistake)<select id="psyMistake"><option value="none">None</option><option value="fomo">FOMO / chased price</option><option value="revenge">Revenge trading</option><option value="overtrading">Overtrading</option><option value="forced">Forced a mediocre setup</option><option value="early-exit">Cut winner early</option><option value="stop-move">Moved / widened stop</option><option value="oversize">Oversized position</option><option value="hesitation">Hesitated / skipped valid setup</option><option value="other">Other</option></select></label>
+    <label>Emotion during the trade<select id="psyEmotion"><option>Calm</option><option>Fear</option><option>Greed</option><option>Anger</option><option>Overconfidence</option><option>Frustration</option><option>Neutral</option></select></label>
+    <label>What triggered the decision / what will you repeat or change?<textarea id="psyNotes" rows="3" placeholder="Write facts, not excuses…"></textarea></label>
+    <button class="btn btn-outline full" type="submit">Save trade review on this device</button>
+   </form>
+  </article>
+ </div>
+ <div class="section-head"><div><div class="eyebrow">YOUR BEHAVIOUR DATA</div><h3>Process scorecard</h3></div></div>
+ <div class="market-grid psy-metrics">
+  <div class="market-card"><span>PLAN ADHERENCE</span><b id="psyAdherence">—</b></div>
+  <div class="market-card"><span>RULE BREAKS</span><b id="psyBreaks">0</b></div>
+  <div class="market-card"><span>CONSECUTIVE LOSSES</span><b id="psyStreak">0</b></div>
+  <div class="market-card"><span>TODAY'S JOURNALED P&amp;L</span><b id="psyTodayPnl">₹0</b></div>
+ </div>
+ <article class="panel"><div class="panel-head"><h3>Recurring mental-game errors</h3><span class="tag">FROM YOUR REVIEWS</span></div><p id="psyPattern" class="muted">Save post-trade reviews to identify repeated triggers and mistakes.</p><div id="psyHistory" class="psy-history">No psychology reviews saved yet.</div></article>
+ <article class="panel">
+  <div class="eyebrow gold">FOUR BOOKS · FOUR PRACTICAL ROUTINES</div><h3>What the reading contributes</h3>
+  <div class="book-grid">
+   <div class="book-card"><b>Trading in the Zone — Mark Douglas</b><p>Think in probabilities, not certainties. Define and accept risk before entry; one outcome does not prove or disprove an edge.</p><small>Routine: judge a trade by rule execution, then review outcomes over a meaningful sample.</small></div>
+   <div class="book-card"><b>The Mental Game of Trading — Jared Tendler</b><p>Track recurring errors and diagnose the trigger, emotion, behaviour and decision that led to them.</p><small>Routine: tag each mistake and look for the same trigger repeating across sessions.</small></div>
+   <div class="book-card"><b>Best Loser Wins — Tom Hougaard</b><p>Build self-awareness around how losses and wins affect decisions. Do not let the need to avoid loss or recover money control execution.</p><small>Routine: accept the planned loss; never increase risk to get back to breakeven.</small></div>
+   <div class="book-card"><b>Trading Psychology 2.0 — Brett Steenbarger</b><p>Move from general advice to repeatable processes, deliberate practice and feedback on the specific skill being improved.</p><small>Routine: choose one execution behaviour to practise and measure each week.</small></div>
+  </div>
+  <p class="muted tiny">These are original, concise applications of the books' broad themes, not book excerpts. Your reviews are saved only in this browser on this device.</p>
+ </article>
+</section>
+
 <section class="page" id="paper"><div class="section-head"><div><div class="eyebrow">SIMULATED EXECUTION ONLY</div><h3>Paper trading desk</h3><p class="muted">Virtual starting capital: ₹50,000. No orders are sent to your broker.</p></div><span class="tag">NO REAL MONEY</span></div><div class="paper-layout"><article class="panel"><h3>Practice order</h3><form id="tradeForm" class="trade-form"><label>Instrument<input id="symbol" value="NIFTY 50" required></label><div class="form-row"><label>Side<select id="side"><option>BUY</option><option>SELL</option></select></label><label>Quantity<input id="qty" type="number" min="1" value="1" required></label></div><div class="form-row"><label>Entry price (₹)<input id="entry" type="number" min="0.05" step="0.05" placeholder="Enter observed price" required></label><label>Stop loss (₹)<input id="stop" type="number" min="0.05" step="0.05" placeholder="Required" required></label></div><label>Target price (₹)<input id="target" type="number" min="0.05" step="0.05" placeholder="Optional"></label><div class="risk-preview" id="riskPreview">Enter entry and stop to calculate planned risk.</div><button class="btn btn-gold full">Record paper trade</button></form></article><article class="panel"><div class="panel-head"><h3>Account summary</h3><span class="tag">₹ INR</span></div><div class="balance" id="paperEquity">₹50,000<span>Virtual equity (realised P&amp;L only)</span></div><div class="portfolio-row"><div><small>Available cash</small><b id="paperCash">₹50,000</b></div><div><small>Trades recorded</small><b id="tradeCount">0</b></div></div><p class="muted tiny">This learning simulator records planned entries and risk. It does not auto-mark-to-market positions or model brokerage, slippage, taxes, option lot sizes, or margin.</p></article></div><article class="panel"><div class="panel-head"><h3>Trade history</h3><button class="text-btn" id="clearTrades">Reset simulator</button></div><div id="tradeHistory" class="history-empty">No practice trades yet. Record your first simulated trade.</div></article></section>
 <section class="page" id="risk"><div class="section-head"><div><div class="eyebrow">CAPITAL PRESERVATION</div><h3>Risk coach</h3><p class="muted">Calculate a planned risk budget before considering any trade.</p></div></div><div class="risk-layout"><article class="panel"><h3>Position sizing calculator</h3><div class="trade-form"><label>Virtual account capital (₹)<input id="riskCapital" type="number" value="50000"></label><div class="form-row"><label>Risk per trade (%)<input id="riskPct" type="number" min=".1" max="2" step=".1" value="0.5"></label><label>Entry price (₹)<input id="riskEntry" type="number" step=".05" placeholder="e.g. 250"></label></div><label>Stop-loss price (₹)<input id="riskStop" type="number" step=".05" placeholder="e.g. 245"></label><div class="risk-result"><small>Maximum planned loss</small><b id="maxLoss">₹250</b><small>Suggested quantity (cash instrument, before charges)</small><b id="suggestQty">—</b></div></div></article><article class="panel"><div class="eyebrow gold">COACH'S RULE</div><h3>Risk is a decision, not an afterthought.</h3><ul class="rules"><li>Define invalidation before entry.</li><li>Never widen a stop just to avoid booking a loss.</li><li>Options can lose value rapidly; gaps and expiry risk matter.</li><li>Paper-test a repeatable setup before risking capital.</li><li>Do not treat a probability estimate as certainty.</li></ul></article></div></section>
 <section class="page" id="journal"><div class="section-head"><div><div class="eyebrow">PROCESS REVIEW</div><h3>Trade journal</h3><p class="muted">Review your decisions and planned risk. Your entries stay in this browser.</p></div></div><article class="panel"><div id="journalList" class="history-empty">Your recorded paper trades will appear here.</div></article></section>
 <footer>TRADING INTELLIGENCE AI <span>Educational tool · Not investment advice · Paper mode by default</span></footer>
 </main></div>
-<script src="/app.js"></script><script src="/backtest-strategies.js"></script>
+<script src="/app.js"></script><script src="/backtest-strategies.js"></script><script src="/psychology.js"></script>
 </body></html>
