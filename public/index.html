@@ -75,13 +75,13 @@
   <label>Instrument<select id="btInstrument"><option value="NSE_INDEX|Nifty 50">NIFTY 50</option><option value="NSE_INDEX|Nifty Bank">BANK NIFTY</option><option value="NSE_INDEX|India VIX">INDIA VIX</option></select></label>
   <label>Timeframe<select id="btInterval"><option value="minutes|5">5 minutes</option><option value="minutes|15">15 minutes</option><option value="minutes|30">30 minutes</option><option value="hours|1">1 hour</option><option value="days|1">1 day</option></select></label>
   <label>From date<input id="btFrom" type="date"></label><label>To date<input id="btTo" type="date"></label>
-  <label>Fast EMA<input id="btFast" type="number" min="2" max="50" value="9"></label><label>Slow EMA<input id="btSlow" type="number" min="3" max="200" value="21"></label>
+  <label>Strategy<select id="btStrategy"><option value="ema">EMA crossover</option><option value="confluence">EMA + VWAP + RSI confluence</option><option value="sweep">Liquidity sweep reversal</option></select></label><label>Fast EMA<input id="btFast" type="number" min="2" max="50" value="9"></label><label>Slow EMA<input id="btSlow" type="number" min="3" max="200" value="21"></label><label>RSI long threshold<input id="btRsiLong" type="number" min="1" max="60" value="55"></label><label>RSI short threshold<input id="btRsiShort" type="number" min="40" max="99" value="45"></label><label>Sweep lookback<input id="btLookback" type="number" min="3" max="50" value="10"></label>
   <label>Trade direction<select id="btDirection"><option value="both">Long + Short</option><option value="long">Long only</option></select></label>
   <label>Cost per side (bps)<input id="btCost" type="number" min="0" max="100" step="0.5" value="2"></label>
  </div>
  <div id="btMessage" class="notice">Connect Upstox. Choose a date range and run the test. Date range Upstox timeframe limits ke according.</div>
  <div class="market-grid ta-stats">
-  <div class="market-card"><span>NET P&amp;L (POINTS / UNIT)</span><b id="btNet">—</b></div><div class="market-card"><span>WIN RATE</span><b id="btWin">—</b></div><div class="market-card"><span>TRADES</span><b id="btTrades">—</b></div><div class="market-card"><span>PROFIT FACTOR</span><b id="btPf">—</b></div><div class="market-card"><span>MAX DRAWDOWN</span><b id="btDd">—</b></div><div class="market-card"><span>AVG TRADE</span><b id="btAvg">—</b></div>
+  <div class="market-card"><span>NET P&amp;L (POINTS / UNIT)</span><b id="btNet">—</b></div><div class="market-card"><span>WIN RATE</span><b id="btWin">—</b></div><div class="market-card"><span>TRADES</span><b id="btTrades">—</b></div><div class="market-card"><span>PROFIT FACTOR</span><b id="btPf">—</b></div><div class="market-card"><span>MAX DRAWDOWN</span><b id="btDd">—</b></div><div class="market-card"><span>AVG TRADE</span><b id="btAvg">—</b></div><div class="market-card"><span>AVERAGE WIN</span><b id="btAvgWin">—</b></div><div class="market-card"><span>AVERAGE LOSS</span><b id="btAvgLoss">—</b></div><div class="market-card"><span>EXPECTANCY / TRADE</span><b id="btExpectancy">—</b></div>
  </div>
  <article class="panel"><div class="panel-head"><h3>Equity curve</h3><span class="tag">AFTER ESTIMATED COSTS</span></div><canvas id="btChart" height="220" style="width:100%;height:220px"></canvas></article>
  <article class="panel"><div class="panel-head"><h3>Trade-by-trade results</h3><span class="tag" id="btCountLabel">NOT RUN</span></div><div class="table-scroll"><table class="option-table"><thead><tr><th>#</th><th>Side</th><th>Entry</th><th>Exit</th><th>Gross P&amp;L</th><th>Costs</th><th>Net P&amp;L</th></tr></thead><tbody id="btRows"><tr><td colspan="7" class="history-empty">No backtest run yet.</td></tr></tbody></table></div></article>
@@ -92,5 +92,5 @@
 <section class="page" id="journal"><div class="section-head"><div><div class="eyebrow">PROCESS REVIEW</div><h3>Trade journal</h3><p class="muted">Review your decisions and planned risk. Your entries stay in this browser.</p></div></div><article class="panel"><div id="journalList" class="history-empty">Your recorded paper trades will appear here.</div></article></section>
 <footer>TRADING INTELLIGENCE AI <span>Educational tool · Not investment advice · Paper mode by default</span></footer>
 </main></div>
-<script src="/app.js"></script>
+<script src="/app.js"></script><script src="/backtest-strategies.js"></script>
 </body></html>
