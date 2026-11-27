@@ -15,6 +15,7 @@ export function evaluateIntelligenceSuite(input={}) {
   const research=input.research||{};
   const ohlcv=research.structure||null;
   const structureEvidence=[...(ohlcv?.evidence||[])];
+  if(ohlcv?.status==="available") structureEvidence.push("Liquidity sweeps: "+(ohlcv.liquiditySweeps?.length||0)+"; order-block candidates: "+(ohlcv.orderBlocks?.length||0)+"; FVG zones: "+(ohlcv.fairValueGaps?.length||0)+".");
   if(move!==null) structureEvidence.push("Spot movement since previous worker observation: "+move+"%.");
   const structureStatus=ohlcv?.status==="available"?"available":move===null?"unavailable":"partial";
   const structure=module("market_structure","Market structure intelligence",structureStatus,null,
