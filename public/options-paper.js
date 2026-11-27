@@ -13,7 +13,7 @@
   '<div class="notice">Risk: 0.5% virtual capital per trade, whole lots only if affordable, 25% premium stop and 50% target (2R). Entry assumes ask; exit marks use bid. Brokerage, taxes and other charges are excluded. Data resets on server restart. Not live performance.</div>';
   const footer=main.querySelector("footer");if(footer)main.insertBefore(page,footer);else main.appendChild(page);
   const $=id=>document.getElementById(id),fmt=n=>Number.isFinite(Number(n))?Number(n).toLocaleString("en-IN",{maximumFractionDigits:2}):"—";
-  const safe=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;',"'":"&#39;"}[c]));
+  const safe=v=>String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
   let selected={instrumentKey:"NSE_INDEX|Nifty 50",symbol:"NIFTY 50"},scan=null,candidates=[];
   function go(){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="optionsDesk"));document.querySelectorAll(".nav").forEach(n=>n.classList.toggle("active",n===nav));const t=$("pageTitle");if(t)t.textContent="Options Paper Trading";window.scrollTo(0,0);refreshStatus();}
   nav.addEventListener("click",go);
