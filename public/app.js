@@ -72,35 +72,49 @@ function drawBt(values){const c=$("#btChart");if(!c)return;const w=c.clientWidth
 async function runBacktest(){
  const msg=$("#btMessage");msg.textContent="Upstox se historical candles fetch ho rahe hain…";
  try{
-  const from=$("#btFrom").value,to=$("#btTo").value,fast=Number($("#btFast").value),slow=Number($("#btSlow").value),costBps=Number($("#btCost").value),direction=$("#btDirection").value;
+  const from=$("#btFrom").value,to=$("#btTo").value,fast=Number($("#btFast").value),slow=Number($("#btSlow").value);
+  const qty=Number($("#btQty").value),fixedCost=Number($("#btFixedCost").value),direction=$("#btDirection").value;
   if(!from||!to||from>to)throw Error("Valid From aur To dates select karein.");
   if(fast<2||slow<=fast)throw Error("Slow EMA, Fast EMA se bada hona chahiye.");
-  if(costBps<0||costBps>100)throw Error("Cost 0 se 100 bps ke beech rakhein.");
+  if(!Number.isFinite(qty)||qty<1||!Number.isInteger(qty))throw Error("Quantity / units kam se kam 1 aur whole number honi chahiye.");
+  if(!Number.isFinite(fixedCost)||fixedCost<0)throw Error("Per-trade charges zero ya usse zyada hone chahiye.");
   const [unit,interval]=$("#btInterval").value.split("|");
   const params=new URLSearchParams({instrument_key:$("#btInstrument").value,unit,interval,range:"custom",from_date:from,to_date:to});
   const response=await fetch("/api/candles?"+params),payload=await response.json();if(!response.ok)throw Error(payload.error||"Historical candle request failed.");
-  const raw=payload.data?.candles||[];const candles=raw.slice().reverse().filter(x=>x.length>=5&&Number.isFinite(Number(x[1]))&&Number.isFinite(Number(x[4])));
+  const raw=payload.data?.candles||[],candles=raw.slice().reverse().filter(x=>x.length>=5&&Number.isFinite(Number(x[1]))&&Number.isFinite(Number(x[4])));
   if(candles.length<slow+3)throw Error("Is date range mein enough candles nahi hain. Range badhayein ya slower EMA kam karein.");
-  const close=candles.map(x=>Number(x[4])),ef=btEma(close,fast),es=btEma(close,slow),trades=[];let pos=0,entry=0,entryTime="",equity=0;const curve=[0];
+  const close=candles.map(x=>Number(x[4])),ef=btEma(close,fast),es=btEma(close,slow),trades=[];
+  let pos=0,entry=0,entryTime="";
   for(let i=1;i<candles.length-1;i++){
    const crossUp=ef[i-1]<=es[i-1]&&ef[i]>es[i],crossDown=ef[i-1]>=es[i-1]&&ef[i]<es[i];
-   let desired=pos;
-   if(crossUp)desired=1;else if(crossDown)desired=direction==="both"?-1:0;
+   let desired=pos;if(crossUp)desired=1;else if(crossDown)desired=direction==="both"?-1:0;
    if(direction==="long"&&crossDown)desired=0;
    if(desired!==pos){
     const px=Number(candles[i+1][1]),time=candles[i+1][0];
-    if(pos!==0){const gross=(px-entry)*pos,notional=Math.abs(entry)+Math.abs(px),fees=notional*costBps/10000,net=gross-fees;equity+=net;trades.push({side:pos>0?"LONG":"SHORT",entry,exit:px,entryTime,exitTime:time,gross,fees,net});curve.push(equity);}
+    if(pos!==0){const grossPoints=(px-entry)*pos,grossRupees=grossPoints*qty,charges=fixedCost,netRupees=grossRupees-charges;trades.push({side:pos>0?"LONG":"SHORT",entry,exit:px,entryTime,exitTime:time,grossPoints,grossRupees,charges,netRupees});}
     if(desired!==0){pos=desired;entry=px;entryTime=time;}else pos=0;
    }
   }
-  if(pos!==0){const last=candles[candles.length-1],px=Number(last[4]),gross=(px-entry)*pos,fees=(Math.abs(entry)+Math.abs(px))*costBps/10000,net=gross-fees;equity+=net;trades.push({side:pos>0?"LONG":"SHORT",entry,exit:px,entryTime,exitTime:last[0],gross,fees,net});curve.push(equity);}
-  const wins=trades.filter(t=>t.net>0),grossWin=wins.reduce((a,t)=>a+t.net,0),grossLoss=Math.abs(trades.filter(t=>t.net<0).reduce((a,t)=>a+t.net,0));
-  let peak=0,maxDd=0;curve.forEach(v=>{peak=Math.max(peak,v);maxDd=Math.max(maxDd,peak-v);});
-  $("#btNet").textContent=btFmt(equity);$("#btWin").textContent=trades.length?(wins.length/trades.length*100).toFixed(1)+"%":"—";$("#btTrades").textContent=trades.length;$("#btPf").textContent=grossLoss?(grossWin/grossLoss).toFixed(2):grossWin?"∞":"—";$("#btDd").textContent=btFmt(maxDd);$("#btAvg").textContent=trades.length?btFmt(equity/trades.length):"—";
-  $("#btRows").innerHTML=trades.slice().reverse().map((t,i)=>"<tr><td>"+(trades.length-i)+"</td><td>"+t.side+"</td><td>"+btFmt(t.entry)+"</td><td>"+btFmt(t.exit)+"</td><td>"+btFmt(t.gross)+"</td><td>"+btFmt(t.fees)+"</td><td>"+btFmt(t.net)+"</td></tr>").join("")||'<tr><td colspan="7" class="history-empty">No completed trades for these rules and dates.</td></tr>';
+  if(pos!==0){const last=candles[candles.length-1],px=Number(last[4]),grossPoints=(px-entry)*pos,grossRupees=grossPoints*qty,charges=fixedCost,netRupees=grossRupees-charges;trades.push({side:pos>0?"LONG":"SHORT",entry,exit:px,entryTime,exitTime:last[0],grossPoints,grossRupees,charges,netRupees});}
+  const wins=trades.filter(t=>t.netRupees>0),losses=trades.filter(t=>t.netRupees<0);
+  const netWins=wins.reduce((s,t)=>s+t.netRupees,0),netLosses=Math.abs(losses.reduce((s,t)=>s+t.netRupees,0));
+  const totalNet=trades.reduce((s,t)=>s+t.netRupees,0),totalCharges=trades.reduce((s,t)=>s+t.charges,0);
+  let equity=0,peak=0,maxDd=0;const curve=[0];trades.forEach(t=>{equity+=t.netRupees;curve.push(equity);peak=Math.max(peak,equity);maxDd=Math.max(maxDd,peak-equity);});
+  const avgWin=wins.length?netWins/wins.length:0,avgLoss=losses.length?losses.reduce((s,t)=>s+t.netRupees,0)/losses.length:0;
+  $("#btNet").textContent=money(totalNet);$("#btWin").textContent=trades.length?(wins.length/trades.length*100).toFixed(1)+"%":"—";
+  $("#btTrades").textContent=trades.length;$("#btPf").textContent=netLosses?(netWins/netLosses).toFixed(2):netWins?"∞":"—";
+  $("#btDd").textContent=money(maxDd);$("#btAvg").textContent=trades.length?money(totalNet/trades.length):"—";
+  if($("#btCharges"))$("#btCharges").textContent=money(totalCharges);
+  if($("#btAvgWin"))$("#btAvgWin").textContent=wins.length?money(avgWin):"—";
+  if($("#btAvgLoss"))$("#btAvgLoss").textContent=losses.length?money(avgLoss):"—";
+  if($("#btExpectancy"))$("#btExpectancy").textContent=trades.length?money(totalNet/trades.length):"—";
+  $("#btRows").innerHTML=trades.slice().reverse().map((t,i)=>"<tr><td>"+(trades.length-i)+"</td><td>"+t.side+"</td><td>"+btFmt(t.entry)+"</td><td>"+btFmt(t.exit)+"</td><td>"+money(t.grossRupees)+"</td><td>"+money(t.charges)+"</td><td>"+money(t.netRupees)+"</td></tr>").join("")||'<tr><td colspan="7" class="history-empty">No completed trades for these rules and dates.</td></tr>';
   $("#btCountLabel").textContent=trades.length+" CLOSED TRADES";drawBt(curve);
-  msg.textContent="Upstox historical response verified · "+candles.length+" candles · "+from+" to "+to+". Results are points per 1 unit, not rupees.";
- }catch(e){msg.textContent=e.message;$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';$("#btNet").textContent="—";$("#btWin").textContent="—";$("#btTrades").textContent="—";$("#btPf").textContent="—";$("#btDd").textContent="—";$("#btAvg").textContent="—";drawBt([]);}
+  msg.textContent="Verified Upstox historical candles · "+candles.length+" candles · "+from+" to "+to+". Rupee P&L uses "+qty+" unit(s); ₹"+fixedCost+" estimated round-trip charges per completed trade. Taxes/slippage may vary.";
+ }catch(e){
+  msg.textContent=e.message;$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';
+  ["btNet","btWin","btTrades","btPf","btDd","btAvg","btAvgWin","btAvgLoss","btExpectancy","btCharges"].forEach(id=>{if($("#"+id))$("#"+id).textContent="—";});drawBt([]);
+ }
 }
 if($("#runBacktest")){
  const today=new Date(),prior=new Date(today.getTime()-30*86400000),iso=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
