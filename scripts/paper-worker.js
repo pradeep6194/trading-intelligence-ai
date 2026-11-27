@@ -54,7 +54,12 @@ async function scanUnderlying(key, rankOptionChain) {
   const expiry = expiries[0];
   const oUrl = new URL("https://api.upstox.com/v2/option/chain"); oUrl.searchParams.set("instrument_key", key); oUrl.searchParams.set("expiry_date", expiry);
   const chain = (await upstox(oUrl)).data || [];
-  return { expiry, ...rankOptionChain(chain, contracts.filter(x => x.expiry === expiry), { minVolume: 1000, minOi: 10000, maxSpreadPct: 3.5, maxDistancePct: 5 }) };
+  const ranked = rankOptionChain(chain, contracts.filter(x => x.expiry === expiry), { minVolume: 1000, minOi: 10000, maxSpreadPct: 3.5, maxDistancePct: 5 });
+  const callOi = chain.reduce((sum, row) => sum + Number(row.call_options?.market_data?.oi || 0), 0);
+  const putOi = chain.reduce((sum, row) => sum + Number(row.put_options?.market_data?.oi || 0), 0);
+  const spot = Number(chain[0]?.underlying_spot_price || 0);
+  const pcr = Number(chain[0]?.pcr || (callOi > 0 ? putOi / callOi : 0));
+  return { expiry, spot, pcr, callOi, putOi, ...ranked };
 }
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "trading-intelligence-"));
 process.env.DATA_DIR = dataDir;
@@ -94,12 +99,37 @@ try {
     try {
       const result = await scanUnderlying(underlyingKey, rankOptionChain);
       const top = result.candidates[0] || null;
-      const observation = top ? {
-        at: Date.now(), underlyingKey, symbol: top.symbol, score: top.volatilityScore, changePct: top.changePct,
-        iv: top.iv, volume: top.volume, oi: top.oi, spreadPct: top.spreadPct,
-        text: top.changePct >= 3 ? top.symbol + " showed positive premium momentum; relative score " + top.volatilityScore + "/100." : "No high-momentum setup in " + underlyingKey + " during this scan."
-      } : { at: Date.now(), underlyingKey, text: "No contract passed the liquidity filters for " + underlyingKey + "." };
-      recordScan({ at: Date.now(), underlyingKey, expiry: result.expiry, candidateCount: result.candidates.length, top: top ? { symbol: top.symbol, side: top.side, score: top.volatilityScore, changePct: top.changePct, spreadPct: top.spreadPct } : null, observation });
+      const stored = JSON.parse(fs.readFileSync(dataFile, "utf8"));
+      stored.autopilot ||= {};
+      stored.autopilot.marketSnapshots ||= {};
+      const previous = stored.autopilot.marketSnapshots[underlyingKey];
+      const spotChangePct = previous?.spot > 0 && result.spot > 0 ? Number(((result.spot - previous.spot) / previous.spot * 100).toFixed(3)) : null;
+      const drivers = [];
+      if (spotChangePct !== null && Math.abs(spotChangePct) >= 0.15) drivers.push("Spot price moved " + (spotChangePct > 0 ? "up " : "down ") + Math.abs(spotChangePct) + "% since the prior scan");
+      if (result.pcr >= 1.2) drivers.push("Put OI exceeds call OI (PCR " + result.pcr.toFixed(2) + ")");
+      else if (result.pcr > 0 && result.pcr <= 0.8) drivers.push("Call OI exceeds put OI (PCR " + result.pcr.toFixed(2) + ")");
+      if (top?.changePct >= 3) drivers.push("Top option premium is up " + top.changePct.toFixed(2) + "% on the day");
+      if (top?.iv >= 35) drivers.push("Elevated implied volatility (" + top.iv.toFixed(1) + "%)");
+      if (top && top.volume >= 10000) drivers.push("High traded volume in the leading contract");
+      if (!drivers.length) drivers.push("No strong directional or positioning imbalance detected from available fields");
+      const observation = {
+        at: Date.now(), underlyingKey, symbol: top?.symbol || null, score: top?.volatilityScore ?? null,
+        changePct: top?.changePct ?? null, iv: top?.iv ?? null, volume: top?.volume ?? null,
+        oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null,
+        spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi,
+        evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi },
+        drivers, summary: top
+          ? underlyingKey + ": leading " + top.side + " contract " + top.symbol + " scored " + top.volatilityScore + "/100. Observed premium change " + top.changePct + "%."
+          : underlyingKey + ": no option contract passed the configured liquidity filters.",
+        text: top ? top.symbol + " · " + drivers.join("; ") : "No liquid candidate for " + underlyingKey + "."
+      };
+      recordScan({ at: observation.at, underlyingKey, expiry: result.expiry, candidateCount: result.candidates.length,
+        top: top ? { symbol: top.symbol, side: top.side, score: top.volatilityScore, changePct: top.changePct, spreadPct: top.spreadPct } : null, observation });
+      const afterScan = JSON.parse(fs.readFileSync(dataFile, "utf8"));
+      afterScan.autopilot ||= {};
+      afterScan.autopilot.marketSnapshots ||= {};
+      afterScan.autopilot.marketSnapshots[underlyingKey] = { at: observation.at, spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi };
+      fs.writeFileSync(dataFile, JSON.stringify(afterScan), { mode: 0o600 });
       if (top) best.push(top);
     } catch (error) {
       recordScan({ at: Date.now(), underlyingKey, error: error.message, candidateCount: 0 });
