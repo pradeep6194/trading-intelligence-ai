@@ -53,7 +53,7 @@
   document.querySelectorAll("[data-goto='engineDesk']").forEach(b => b.addEventListener("click", goEngine));
   const $ = id => document.getElementById(id);
   const fmt = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString("en-IN",{maximumFractionDigits:2}) : "—";
-  let lastAnalysis = null;
+  let lastAnalysis = null, lastAnalysisInput = null;
   $("engMarket").addEventListener("change", () => $("engManualWrap").classList.toggle("hidden", $("engMarket").value !== "CRUDE_OIL"));
   async function refreshStatus() {
     try {
@@ -82,6 +82,7 @@
       }
       const body = {market,candles,optionsData:{pcr:Number($("engPcr").value),callOiChange:Number($("engCallOi").value),putOiChange:Number($("engPutOi").value)}};
       for (const k of Object.keys(body.optionsData)) if (!Number.isFinite(body.optionsData[k])) delete body.optionsData[k];
+      lastAnalysisInput = body;
       const response = await fetch("/api/trading/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Analysis failed");
       lastAnalysis = data;
