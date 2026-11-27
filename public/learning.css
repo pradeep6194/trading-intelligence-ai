@@ -20,3 +20,5 @@
 .learn-suite-decision small{font-size:10px;color:var(--muted)}
 
 .learn-feed-news{margin-top:14px}.learn-feed-news h4{margin:12px 0}.learn-feed-news .learn-event{margin:10px 0;padding:12px;border:1px solid var(--line,#263246);border-radius:12px}.learn-feed-news a{color:var(--gold,#d6b46a);font-size:13px}.learn-feed-news small{display:block;color:var(--muted,#9aa7b8);font-size:11px}
+
+.learn-research-detail{margin-top:12px;padding:12px;border:1px solid var(--line,#263246);border-radius:12px}.learn-research-detail p{margin:7px 0;font-size:13px}.learn-research-detail small{color:var(--muted,#9aa7b8);font-size:11px}
