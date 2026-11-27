@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normaliseCandles, analyseOhlcvStructure, analyseMarketBreadth, summariseInstitutionalFlows, normaliseVerifiedNews } from "./research-feeds.js";
+import { normaliseCandles, analyseOhlcvStructure, analyseMarketBreadth, summariseInstitutionalFlows, normaliseVerifiedNews, analyseSectorBreadth, backtestStructure } from "./research-feeds.js";
 
 test("normalises valid Upstox candle arrays and sorts by timestamp",()=>{
   const rows=[["2026-11-27T09:25:00+05:30",101,104,100,103,1500,0],["2026-11-27T09:20:00+05:30",100,102,99,101,1000,0]];
@@ -33,4 +33,17 @@ test("news normaliser accepts only recent Upstox-linked items with publication t
     {heading:"Old",article_link:"https://upstox.com/news/old",published_time:now-9*86400000}
   ]}},now);
   assert.equal(result.length,1); assert.equal(result[0].headline,"Fresh");
+});
+
+test("sector breadth groups instrument returns without inventing missing sectors",()=>{
+  const result=analyseSectorBreadth({"NSE_INDEX|Nifty IT":{net_change:3},"NSE_INDEX|Nifty Bank":{net_change:-2}},{"NSE_INDEX|Nifty IT":"IT","NSE_INDEX|Nifty Bank":"Bank","NSE_INDEX|Nifty Auto":"Auto"});
+  assert.equal(result.IT.advances,1);assert.equal(result.Bank.declines,1);assert.equal(result.Auto,undefined);
+});
+test("backtest uses chronological split and reports out-of-sample metrics separately",()=>{
+  const rows=[];
+  for(let i=0;i<220;i++){const close=100+i*.1+Math.sin(i/3)*.8;rows.push([new Date(Date.UTC(2026,0,1,0,i)).toISOString(),close-.1,close+.3,close-.3,close,1000+i,0]);}
+  const result=backtestStructure(rows,{horizon:3,costBps:10});
+  assert.equal(result.method.includes("chronological 70/30 split"),true);
+  assert.ok(result.train.trades>0);assert.ok(result.outOfSample.trades>=0);assert.equal(result.assumptions.roundTripCostPct,.2);
+  assert.ok(result.outOfSample.maxDrawdownPct>=0);
 });
