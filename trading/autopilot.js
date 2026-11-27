@@ -8,13 +8,21 @@ export function getAutopilotStatus() {
   const closed = (a.trades || []).filter(t => t.status !== "open");
   const wins = closed.filter(t => Number(t.pnl) > 0);
   const pnl = closed.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+  const groups = new Map();
+  for (const trade of closed) {
+    const key = trade.side || "unknown";
+    const group = groups.get(key) || { side: key, trades: 0, wins: 0, pnl: 0 };
+    group.trades += 1; if (Number(trade.pnl) > 0) group.wins += 1; group.pnl += Number(trade.pnl || 0);
+    groups.set(key, group);
+  }
+  const learningSummary = [...groups.values()].map(g => ({ ...g, winRate: Number((g.wins / g.trades * 100).toFixed(1)), averagePnl: Number((g.pnl / g.trades).toFixed(2)), pnl: Number(g.pnl.toFixed(2)) }));
   const days = a.startedAt ? Math.min(90, Math.floor(elapsed / DAY) + 1) : 0;
   return {
     active: Boolean(a.active), startedAt: a.startedAt, endsAt: a.startedAt ? a.startedAt + 90 * DAY : null,
     calendarDaysElapsed: days, calendarDaysRemaining: Math.max(0, 90 - days),
     scanCount: (a.scans || []).length, lastScanAt: a.lastScanAt || null, lastError: a.lastError || null,
     tradeCount: (a.trades || []).length, closedTrades: closed.length, winRate: closed.length ? Number((wins.length / closed.length * 100).toFixed(1)) : null,
-    realizedPnl: Number(pnl.toFixed(2)), observations: (a.observations || []).slice(-20).reverse(),
+    realizedPnl: Number(pnl.toFixed(2)), learningSummary, observations: (a.observations || []).slice(-20).reverse(),
     recentScans: (a.scans || []).slice(-10).reverse(), recentTrades: (a.trades || []).slice(-50).reverse()
   };
 }
