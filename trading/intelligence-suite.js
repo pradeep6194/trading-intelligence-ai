@@ -36,12 +36,12 @@ export function evaluateIntelligenceSuite(input={}) {
     inst?.status==="available"?"FII/DII reported activity loaded; latest records "+(inst.fii?.length||0)+" FII and "+(inst.dii?.length||0)+" DII.":"Institutional activity feed unavailable.",
     [...(inst?.fii||[]).slice(0,3).map(x=>"FII "+x.segment+" net ₹"+x.netAmount),...(inst?.dii||[]).slice(0,2).map(x=>"DII "+x.segment+" net ₹"+x.netAmount)],
     inst?.limitations||["Do not interpret aggregate option OI as confirmed institutional activity."]);
-  const br=research.breadth||null;
+  const br=research.breadth||null;\n  const sectors=research.sectorBreadth||{};\n  const sectorEvidence=Object.entries(sectors).map(([name,x])=>name+": "+x.bias+" ("+x.advances+"/"+x.declines+")");
   const breadth=module("market_wide","Market-wide intelligence",br?.status||"unavailable",null,
     br?.status==="available"?"Sampled breadth "+br.bias+": "+br.advances+" advances / "+br.declines+" declines from "+br.sampleSize+" instruments.":"Market breadth quote sample unavailable.",
     br?.status==="available"?["A/D ratio "+(br.advanceDeclineRatio??"undefined"),"Breadth differential "+br.breadthPct+"%"]:[],
-    br?.limitations||["No quote rows available."]);
-  const newsItems=research.news||[];
+    [...(br?.limitations||["No quote rows available."]),...(br?.coverage?.successfulQuoteChunks<br?.coverage?.totalQuoteChunks?["Only "+br.coverage.successfulQuoteChunks+"/"+br.coverage.totalQuoteChunks+" quote chunks succeeded."]:[])]);
+  const newsItems=research.news||[];\n  const exchangeNews=research.exchangeAnnouncements||[];
   const news=module("news_events","News and event intelligence",newsItems.length?"available":"unavailable",null,
     newsItems.length?newsItems.length+" timestamped Upstox News API items verified against provider article links.":"No verified instrument news returned in the latest request.",
     newsItems.slice(0,5).map(x=>x.headline+" ("+x.instrumentKey+")"),
@@ -82,7 +82,7 @@ export function evaluateIntelligenceSuite(input={}) {
     reason: bias==="neutral"?"Insufficient aligned independent evidence; no directional paper decision from the integrated layer.":"Directional hypothesis only; the existing paper strategy and risk gates remain authoritative.",
     liveTradingEnabled:false
   };
-  return {version:2,at:Date.now(),research,modules,decision,
+  return {version:3,at:Date.now(),research,modules,decision,
     dataQuality:{availableModules:modules.filter(m=>m.status==="available"||m.status==="partial"||m.status==="research_ready").length,
       totalModules:10,unavailableModules:modules.filter(m=>m.status==="unavailable").map(m=>m.id)},
     guardrails:["No live orders.","Missing data is labelled unavailable, never imputed.","A module score is not a probability.","Existing paper-trading risk rules remain authoritative."]};
