@@ -134,7 +134,7 @@ app.get("/api/candles", async (req, res) => {
     const customFrom=String(req.query.from_date||"");
     const customTo=String(req.query.to_date||"");
     if(range==="custom" && (!isoDate(customFrom)||!isoDate(customTo)||customFrom>customTo)) return res.status(400).json({error:"Valid from_date aur to_date (YYYY-MM-DD) select karein."});
-    if(range==="custom" && (Date.parse(customTo)-Date.parse(customFrom)>366*86400000)) return res.status(400).json({error:"Backtest date range maximum 366 days hai."});
+    const spanDays=(Date.parse(customTo)-Date.parse(customFrom))/86400000;\n    const maxDays=unit==="minutes"?(Number(interval)<=15?31:92):unit==="hours"?92:3660;\n    if(range==="custom" && spanDays>maxDays) return res.status(400).json({error:"Selected timeframe ke liye date range maximum "+maxDays+" days hai. Upstox V3 historical API limit follow karein."});
     const intraday=range==="today";
     const toDate=range==="custom"?customTo:String(req.query.to_date||new Date().toISOString().slice(0,10));
     const fromDate=range==="custom"?customFrom:String(req.query.from_date||new Date(Date.now()-7*86400000).toISOString().slice(0,10));
