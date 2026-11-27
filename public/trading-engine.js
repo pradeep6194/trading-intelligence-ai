@@ -80,8 +80,9 @@
         if (!response.ok) throw new Error(payload.error || "Upstox candle request failed");
         candles = (payload.data?.candles || []).slice().reverse().map(c => ({timestamp:c[0],open:Number(c[1]),high:Number(c[2]),low:Number(c[3]),close:Number(c[4]),volume:Number(c[5]||0)}));
       }
-      const body = {market,candles,optionsData:{pcr:Number($("engPcr").value),callOiChange:Number($("engCallOi").value),putOiChange:Number($("engPutOi").value)}};
-      for (const k of Object.keys(body.optionsData)) if (!Number.isFinite(body.optionsData[k])) delete body.optionsData[k];
+      const optionsData = {};
+      [["pcr","engPcr"],["callOiChange","engCallOi"],["putOiChange","engPutOi"]].forEach(([key,id]) => { const raw=$(id).value.trim(); if(raw!==""){ const value=Number(raw); if(Number.isFinite(value)) optionsData[key]=value; }});
+      const body = {market,candles,optionsData};
       lastAnalysisInput = body;
       const response = await fetch("/api/trading/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Analysis failed");
