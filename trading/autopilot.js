@@ -21,7 +21,7 @@ export function getAutopilotStatus() {
     active: Boolean(a.active), startedAt: a.startedAt, endsAt: a.startedAt ? a.startedAt + 90 * DAY : null,
     calendarDaysElapsed: days, calendarDaysRemaining: Math.max(0, 90 - days),
     scanCount: (a.scans || []).length, lastScanAt: a.lastScanAt || null, lastError: a.lastError || null,
-    integratedIntelligence: (a.observations || []).find(o => o.intelligence)?.intelligence || null, 
+    integratedIntelligence: [...(a.observations || [])].reverse().find(o => o.intelligence)?.intelligence || null, 
     latestResearch: a.latestResearch || null,
     tradeCount: (a.trades || []).length, closedTrades: closed.length, winRate: closed.length ? Number((wins.length / closed.length * 100).toFixed(1)) : null,
     realizedPnl: Number(pnl.toFixed(2)), learningSummary, observations: (a.observations || []).slice(-20).reverse(),
