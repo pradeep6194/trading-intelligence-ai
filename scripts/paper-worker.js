@@ -134,7 +134,7 @@ try {
       const observation = {
         at: Date.now(), underlyingKey, symbol: top?.symbol || null, score: top?.volatilityScore ?? null,
         changePct: top?.changePct ?? null, iv: top?.iv ?? null, volume: top?.volume ?? null,
-        oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null, regime,
+        oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null, regime: analysis.regime,
         spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi,
         evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange, callOi: result.callOi, putOi: result.putOi, callOiChange: result.callOiChange, putOiChange: result.putOiChange, callOiChangePct, putOiChangePct },
         analysis, drivers, summary: top
