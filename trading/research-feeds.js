@@ -92,3 +92,43 @@ export function normaliseVerifiedNews(payload, now = Date.now()) {
   const seen=new Set();
   return items.filter(x=>{const key=x.url||x.headline;if(seen.has(key))return false;seen.add(key);return true;}).sort((a,b)=>b.publishedAt-a.publishedAt);
 }
+
+export function analyseSectorBreadth(quotes = {}, sectorMap = {}) {
+  const groups = {};
+  for (const [key, sector] of Object.entries(sectorMap)) {
+    const q=quotes[key]; if(!q) continue;
+    const change=finite(q.net_change ?? (finite(q.last_price)!=null&&finite(q.ohlc?.close)!=null?Number(q.last_price)-Number(q.ohlc.close):null));
+    if(change===null) continue;
+    (groups[sector] ||= []).push(change);
+  }
+  return Object.fromEntries(Object.entries(groups).map(([sector,values])=>{
+    const advances=values.filter(x=>x>0).length, declines=values.filter(x=>x<0).length;
+    return [sector,{sampleSize:values.length,advances,declines,unchanged:values.length-advances-declines,breadthPct:Number(((advances-declines)/values.length*100).toFixed(2)),bias:advances>declines?"positive":declines>advances?"negative":"neutral"}];
+  }));
+}
+
+export function backtestStructure(rows, options = {}) {
+  const candles=normaliseCandles(rows), horizon=options.horizon||3, costBps=options.costBps??10;
+  const warmup=Math.max(options.warmup||30,20), split=Math.floor(candles.length*(options.trainFraction||0.7));
+  const trades=[];
+  for(let i=warmup;i+horizon<candles.length;i++){
+    const history=candles.slice(0,i+1), current=candles[i], prior=history.slice(-21,-1);
+    const swingHigh=Math.max(...prior.map(c=>c.high)), swingLow=Math.min(...prior.map(c=>c.low));
+    let direction=0;
+    if(current.close>swingHigh) direction=1;
+    else if(current.close<swingLow) direction=-1;
+    if(!direction) continue;
+    const exit=candles[i+horizon].close;
+    const gross=(exit/current.close-1)*direction*100;
+    const net=gross-2*costBps/100;
+    trades.push({index:i,at:current.timestamp,direction:direction>0?"long":"short",entry:current.close,exit, grossPct:Number(gross.toFixed(4)),netPct:Number(net.toFixed(4)),set:i<split?"train":"test"});
+  }
+  const metrics=items=>{
+    if(!items.length)return {trades:0,winRatePct:null,netReturnPct:0,expectancyPct:null,profitFactor:null,maxDrawdownPct:null};
+    let equity=1,peak=1,maxDD=0,gains=0,losses=0,wins=0;
+    for(const t of items){const r=t.netPct/100;equity*=1+r;peak=Math.max(peak,equity);maxDD=Math.max(maxDD,(peak-equity)/peak*100);if(r>0){wins++;gains+=r;}else losses+=Math.abs(r);}
+    return {trades:items.length,winRatePct:Number((wins/items.length*100).toFixed(2)),netReturnPct:Number(((equity-1)*100).toFixed(2)),expectancyPct:Number((items.reduce((a,t)=>a+t.netPct,0)/items.length).toFixed(4)),profitFactor:losses?Number((gains/losses).toFixed(3)):null,maxDrawdownPct:Number(maxDD.toFixed(2))};
+  };
+  const train=trades.filter(t=>t.set==="train"),test=trades.filter(t=>t.set==="test");
+  return {status:test.length>=10?"research_ready":"insufficient_out_of_sample_trades",candleCount:candles.length,splitAt:split,method:"Fixed 20-candle breakout; enter on close; exit after "+horizon+" candles; chronological 70/30 split; no parameter tuning.",assumptions:{horizon,costBpsPerSide:costBps,roundTripCostPct:2*costBps/100,slippageIncluded:false},train:metrics(train),outOfSample:metrics(test),trades:trades.slice(-100),limitations:["Historical OHLCV test is not a live strategy or guaranteed edge.","Fixed transaction cost is a modelling assumption; actual brokerage, STT, GST, exchange charges, impact and slippage may differ.","No intrabar stop/target simulation; signals use candle closes and exit after fixed horizon.","Only the latest returned history window is tested; results require multiple market regimes and walk-forward validation."]};
+}
