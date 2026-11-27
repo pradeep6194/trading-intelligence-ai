@@ -202,7 +202,8 @@ try {
         spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange,
         callOiChangePct, putOiChangePct, premiumChangePct: top?.changePct ?? null,
         iv: top?.iv ?? null, volume: top?.volume ?? null, spreadPct: top?.spreadPct ?? null,
-        observations: stored.autopilot.observations || [], trades: stored.autopilot.trades || []
+        observations: stored.autopilot.observations || [], trades: stored.autopilot.trades || [],
+        research: {institutional:research.institutional,breadth:research.breadth,sectorBreadth:research.sectorBreadth,news:research.news,exchangeAnnouncements:research.exchangeAnnouncements,backtests:research.backtests,structure:research.structures[underlyingKey]?.["5m"]||null}
       });
       const priorObservation = (stored.autopilot.observations || []).slice().reverse()
         .find(item => item.underlyingKey === underlyingKey && item.analysis && !item.forwardOutcome && item.evidence?.spot > 0);
