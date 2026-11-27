@@ -337,6 +337,33 @@ function summarizeExperiment(a = {}) {
     recentScans: (a.scans || []).slice(-10).reverse(), recentTrades: trades.slice(-50).reverse()
   };
 }
+app.get("/api/setup/checks", async (_req, res) => {
+  const checks = {
+    render: { configured: true, ok: true, detail: "Dashboard server is responding." },
+    supabase: { configured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY), ok: false, detail: "Not configured in Render Environment." },
+    upstox: { configured: Boolean(process.env.UPSTOX_ANALYTICS_TOKEN), ok: false, detail: "Read-only Analytics Token not configured in Render Environment." }
+  };
+  if (checks.supabase.configured) {
+    try {
+      const db = await readSupabaseExperiment();
+      checks.supabase.ok = true;
+      checks.supabase.detail = "Supabase table is reachable and the experiment state can be read.";
+      checks.supabase.experimentActive = Boolean(db.payload.autopilot?.active);
+    } catch (e) { checks.supabase.detail = e.message; }
+  }
+  if (checks.upstox.configured) {
+    try {
+      const url = new URL("https://api.upstox.com/v2/option/contract");
+      url.searchParams.set("instrument_key", "NSE_INDEX|Nifty 50");
+      const response = await fetch(url, { headers: { Accept: "application/json", Authorization: "Bearer " + process.env.UPSTOX_ANALYTICS_TOKEN } });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.errors?.[0]?.message || "Upstox API returned " + response.status);
+      checks.upstox.ok = true;
+      checks.upstox.detail = "Upstox read-only option-contract API accepted the token.";
+    } catch (e) { checks.upstox.detail = e.message; }
+  }
+  res.json({ checks, ready: checks.render.ok && checks.supabase.ok && checks.upstox.ok, checkedAt: new Date().toISOString() });
+});
 app.get("/api/autopilot/status", async (_req, res) => {
   try {
     const db = await readSupabaseExperiment(), a = db.payload.autopilot || {};
