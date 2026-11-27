@@ -80,7 +80,7 @@ export function autoPaperTrade(a){
   if(state.open.some(p=>p.market===a.market))return {executed:false,reason:"Position already open for this market",analysis:a,status:st};
   const riskCash=state.capital*state.riskPct/100,qty=Math.floor(riskCash/a.plan.stopDistance);
   if(!Number.isFinite(qty)||qty<1)return {executed:false,reason:"Calculated quantity below one unit",analysis:a,status:st};
-  if(qty*a.plan.entry>state.capital)return {executed:false,reason:"Position notional exceeds paper capital",analysis:a,status:st};
+  if(qty*a.plan.entry>state.capital*10)return {executed:false,reason:"Position notional exceeds 10x paper capital exposure cap",analysis:a,status:st};
   const p={id:"PAPER-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),day:state.day,market:a.market,direction:a.signal,entry:a.plan.entry,stopLoss:a.plan.stopLoss,target:a.plan.target,quantity:qty,riskCash:qty*a.plan.stopDistance,openedAt:Date.now()};
   state.open.push(p);state.trades.push({...p,pnl:0,status:"open"});return {executed:true,order:p,status:paperStatus()};
 }
