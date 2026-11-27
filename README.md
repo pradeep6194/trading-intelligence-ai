@@ -50,3 +50,14 @@ Open `http://localhost:3000`.
 - https://upstox.com/developer/api-documentation/v3/get-market-data-feed/
 - https://upstox.com/developer/api-documentation/get-market-data-feed-authorize-v3/
 - https://github.com/upstox/upstox-php/blob/master/examples/websocket/market_data/v3/protobuf/MarketDataFeedV3.proto
+
+
+## 90-day autonomous paper experiment (read-only market data)
+- The Options Paper Desk can run a server-side NSE F&O scan every five minutes during weekday NSE market hours, even when the browser is closed. The worker downloads Upstox’s daily NSE instrument master and discovers current NSE F&O option underlyings (stock and index). It rotates through batches of 20 underlyings per scan cycle so the complete universe is covered over successive cycles. A fallback shortlist is used only if the instrument master cannot be loaded.
+- The worker uses a conservative momentum/liquidity gate before opening a simulated long CE/PE position. It never submits broker orders. It records scans, entry reasons, exits, P&L and simple measured summaries. These are rule-based observations, not self-modifying AI or a claim of predictive learning.
+- Configure `UPSTOX_ANALYTICS_TOKEN` in the Render service environment. Upstox Analytics Tokens are long-lived and read-only, and support market-data APIs including option chain and WebSocket. They do not permit trading orders. The ordinary OAuth access token expires at 3:30 AM the following day and cannot be kept alive by merely storing it.
+- Set `DATA_DIR=/var/data` and attach a Render Persistent Disk mounted at `/var/data` to preserve the experiment database across deploys/restarts. Without a persistent disk (or an external database), the local JSON store is ephemeral and data can be lost.
+- Use a paid, always-on Render Web Service for unattended operation. Render free web services spin down after 15 minutes without inbound traffic; while asleep, this in-process scanner cannot run. A browser being closed is fine only while the backend service remains running.
+- Optional environment variables: `PAPER_AUTOPILOT_ENABLED=false` to prevent automatic startup; `PAPER_SCAN_INTERVAL_MS=300000` (minimum 60000); `PAPER_SCAN_BATCH_SIZE=20`; `PAPER_SCAN_UNDERLYINGS` as a comma-separated override list of Upstox underlying instrument keys.
+- The 90-day clock begins on first activation. The default scan is a curated shortlist, not every NSE F&O stock; NSE holidays are not independently calendar-filtered. Check data freshness and Upstox API limits before widening the list.
+- The paper engine uses simulated entries at ask and marks/exits at bid. Real-world slippage, exchange charges and taxes can differ. The experiment is research, not financial advice or a promise of profit.

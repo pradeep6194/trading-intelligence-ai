@@ -1,5 +1,8 @@
+import { readPersistentStore, updatePersistentStore } from "./persistent-store.js";
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-const state = {
+const savedState = readPersistentStore().optionsPaper;
+const state = savedState ? { ...savedState } : {
   capital: Number(process.env.OPTIONS_PAPER_CAPITAL || 200000),
   riskPct: 0.5,
   dailyLossPct: 2,
@@ -9,6 +12,9 @@ const state = {
   day: new Date().toISOString().slice(0, 10),
   locked: false
 };
+function persistState() {
+  updatePersistentStore(store => { store.optionsPaper = state; return store; });
+}
 function rollDay() {
   const d = new Date().toISOString().slice(0, 10);
   if (d !== state.day) { state.day = d; state.locked = false; }
@@ -99,7 +105,7 @@ export function openOptionsPaper(candidate) {
     entry, stop, target, lastPrice: entry, riskCash: Number((riskPerLot * lots).toFixed(2)),
     openedAt: Date.now(), status: "open", pnl: 0
   };
-  state.open.push(position); state.trades.push(position);
+  state.open.push(position); state.trades.push(position); persistState();
   return { opened: true, position, status: optionsPaperStatus() };
 }
 export function markOptionsPaper(instrumentKey, bidPrice) {
@@ -110,13 +116,14 @@ export function markOptionsPaper(instrumentKey, bidPrice) {
   p.lastPrice = bid;
   const stopHit = bid <= p.stop, targetHit = bid >= p.target;
   const unrealized = Number(((bid - p.entry) * p.quantity).toFixed(2));
-  if (!stopHit && !targetHit) { p.unrealizedPnl = unrealized; return { updated: true, closed: false, unrealizedPnl: unrealized, status: optionsPaperStatus() }; }
+  if (!stopHit && !targetHit) { p.unrealizedPnl = unrealized; persistState(); return { updated: true, closed: false, unrealizedPnl: unrealized, status: optionsPaperStatus() }; }
   const exit = stopHit ? p.stop : p.target;
   const pnl = Number(((exit - p.entry) * p.quantity).toFixed(2));
   Object.assign(p, { exit, pnl, status: stopHit ? "stopped" : "target_hit", closedAt: Date.now() });
   state.open = state.open.filter(x => x.id !== p.id);
   const realized = todayTrades().filter(t => t.status !== "open").reduce((s,t) => s + t.pnl, 0);
   if (realized <= -(state.capital * state.dailyLossPct / 100)) state.locked = true;
+  persistState();
   return { updated: true, closed: true, trade: p, status: optionsPaperStatus() };
 }
 export function closeOptionsPaper(instrumentKey, bidPrice) {
@@ -129,5 +136,6 @@ export function closeOptionsPaper(instrumentKey, bidPrice) {
   state.open = state.open.filter(x => x.id !== p.id);
   const realized = todayTrades().filter(t => t.status !== "open").reduce((s,t) => s + t.pnl, 0);
   if (realized <= -(state.capital * state.dailyLossPct / 100)) state.locked = true;
+  persistState();
   return { closed: true, trade: p, status: optionsPaperStatus() };
 }

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 import protobuf from "protobufjs";
+import { gunzipSync } from "node:zlib";
 
 dotenv.config();
 const app = express();
@@ -14,7 +15,7 @@ const CLIENT_ID = process.env.UPSTOX_CLIENT_ID;
 const CLIENT_SECRET = process.env.UPSTOX_CLIENT_SECRET;
 const REDIRECT_URI = process.env.UPSTOX_REDIRECT_URI || `http://localhost:${PORT}/auth/callback`;
 const INSTRUMENTS = (process.env.UPSTOX_INSTRUMENT_KEYS || "NSE_INDEX|Nifty 50,NSE_INDEX|Nifty Bank,NSE_INDEX|India VIX").split(",").map(x => x.trim()).filter(Boolean);
-let accessToken = null, oauthState = null, feedSocket = null, reconnectTimer = null, reconnectAttempt = 0;
+let accessToken = process.env.UPSTOX_ANALYTICS_TOKEN || null, oauthState = null, feedSocket = null, reconnectTimer = null, reconnectAttempt = 0;
 let protoRoot = null, feedStatus = "disconnected", lastTickAt = null, lastError = null;
 const latest = {};
 const sseClients = new Set();
@@ -150,6 +151,7 @@ app.get("/api/candles", async (req, res) => {
 
 import { analyseMarket, autoPaperTrade, markPaperPosition, paperStatus } from "./trading/engine.js";
 import { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper, optionsPaperStatus } from "./trading/options-paper.js";
+import { getAutopilotStatus, startAutopilot, stopAutopilot, recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotError, hasEnteredUnderlyingToday, markUnderlyingEnteredToday } from "./trading/autopilot.js";
 
 async function upstoxJson(url) {
   const response = await fetch(url, { headers: { accept: "application/json", Authorization: "Bearer " + accessToken } });
@@ -179,6 +181,130 @@ async function getRankedOptionScan(underlyingKey, requestedExpiry, filters = {})
   const ranked = rankOptionChain(rows, contracts.filter(c => c.expiry === expiry), filters);
   return { underlyingKey, expiry, expiries, spot: Number(rows[0]?.underlying_spot_price || 0), pcr: rows[0]?.pcr ?? null, ...ranked, scannedAt: Date.now() };
 }
+
+const DEFAULT_PAPER_UNDERLYINGS = [
+  "NSE_INDEX|Nifty 50", "NSE_INDEX|Nifty Bank",
+  "NSE_EQ|RELIANCE", "NSE_EQ|HDFCBANK", "NSE_EQ|ICICIBANK", "NSE_EQ|SBIN",
+  "NSE_EQ|INFY", "NSE_EQ|TCS", "NSE_EQ|AXISBANK", "NSE_EQ|LT",
+  "NSE_EQ|BHARTIARTL", "NSE_EQ|TATAMOTORS"
+];
+const customPaperUniverse = process.env.PAPER_SCAN_UNDERLYINGS;
+let PAPER_UNDERLYINGS = (customPaperUniverse || DEFAULT_PAPER_UNDERLYINGS.join(",")).split(",").map(x => x.trim()).filter(validateUnderlyingKey);
+let paperUniverseLoaded = Boolean(customPaperUniverse), scanCursor = 0;
+const PAPER_BATCH_SIZE = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 20));
+async function loadPaperUniverse() {
+  if (paperUniverseLoaded) return;
+  try {
+    const response = await fetch("https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz");
+    if (!response.ok) throw new Error("Upstox NSE instrument master returned " + response.status);
+    const compressed = Buffer.from(await response.arrayBuffer());
+    const instruments = JSON.parse(gunzipSync(compressed).toString("utf8"));
+    const keys = new Set();
+    for (const item of instruments) {
+      if (item.segment === "NSE_FO" && ["CE", "PE"].includes(item.instrument_type) &&
+          ["EQUITY", "INDEX"].includes(item.underlying_type) && validateUnderlyingKey(item.underlying_key)) keys.add(item.underlying_key);
+    }
+    if (keys.size) PAPER_UNDERLYINGS = [...new Set([...DEFAULT_PAPER_UNDERLYINGS.slice(0, 2), ...keys])];
+    paperUniverseLoaded = true;
+    console.log("Loaded NSE F&O option underlyings:", PAPER_UNDERLYINGS.length);
+  } catch (error) {
+    paperUniverseLoaded = true;
+    console.error("Could not load full NSE F&O universe; using fallback shortlist:", error.message);
+  }
+}
+const PAPER_SCAN_INTERVAL_MS = Math.max(60000, Number(process.env.PAPER_SCAN_INTERVAL_MS || 300000));
+let autopilotBusy = false;
+
+function indiaMarketClock() {
+  const parts = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  const v = Object.fromEntries(parts.map(p => [p.type, p.value]));
+  return { weekday: v.weekday, hour: Number(v.hour), minute: Number(v.minute) };
+}
+function isIndiaMarketSession() {
+  const t = indiaMarketClock(), mins = t.hour * 60 + t.minute;
+  return !["Sat", "Sun"].includes(t.weekday) && mins >= 555 && mins <= 925;
+}
+function indiaDateKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+async function refreshAutopilotPositions() {
+  for (const position of optionsPaperStatus().openPositions) {
+    try {
+      const url = new URL("https://api.upstox.com/v2/option/chain");
+      url.searchParams.set("instrument_key", position.underlyingKey);
+      url.searchParams.set("expiry_date", position.expiry);
+      const payload = await upstoxJson(url);
+      let bid = null;
+      for (const row of payload.data || []) for (const side of ["call_options", "put_options"]) {
+        const opt = row[side];
+        if (opt?.instrument_key === position.instrumentKey) bid = Number(opt.market_data?.bid_price);
+      }
+      if (bid > 0) {
+        const result = markOptionsPaper(position.instrumentKey, bid);
+        if (result.closed && result.trade) updateAutopilotTrade(result.trade.id, { status: result.trade.status, exit: result.trade.exit, pnl: result.trade.pnl, closedAt: result.trade.closedAt, outcomeReason: result.trade.status === "stopped" ? "Live bid touched the 25% premium stop." : "Live bid touched the 50% premium target." });
+      }
+    } catch (error) { console.error("Autopilot position refresh failed:", error.message); }
+  }
+}
+async function runAutopilotCycle() {
+  if (autopilotBusy || !getAutopilotStatus().active) return;
+  if (!accessToken) { recordAutopilotError("Set UPSTOX_ANALYTICS_TOKEN in the server environment to enable unattended read-only market data."); return; }
+  if (!isIndiaMarketSession()) return;
+  const experiment = getAutopilotStatus();
+  if (experiment.calendarDaysElapsed >= 90 && experiment.startedAt && Date.now() >= experiment.endsAt) { stopAutopilot(); return; }
+  autopilotBusy = true;
+  try {
+    await refreshAutopilotPositions();
+    await loadPaperUniverse();
+    const day = indiaDateKey(), filters = { minVolume: 1000, minOi: 10000, maxSpreadPct: 3.5, maxDistancePct: 5 };
+    const batch = PAPER_UNDERLYINGS.length <= PAPER_BATCH_SIZE ? PAPER_UNDERLYINGS : Array.from({ length: PAPER_BATCH_SIZE }, (_, i) => PAPER_UNDERLYINGS[(scanCursor + i) % PAPER_UNDERLYINGS.length]);
+    scanCursor = (scanCursor + batch.length) % Math.max(1, PAPER_UNDERLYINGS.length);
+    const best = [];
+    for (const underlyingKey of batch) {
+      try {
+        const scan = await getRankedOptionScan(underlyingKey, undefined, filters);
+        const top = scan.candidates[0] || null;
+        const observation = top ? {
+          text: top.changePct >= 3 ? top.symbol + " showed positive premium momentum with relative score " + top.volatilityScore + "/100." : "No strong positive premium-momentum candidate in " + underlyingKey + " at this scan.",
+          underlyingKey, symbol: top.symbol, score: top.volatilityScore, changePct: top.changePct,
+          iv: top.iv, volume: top.volume, oi: top.oi, spreadPct: top.spreadPct
+        } : { text: "No contract passed liquidity filters for " + underlyingKey + ".", underlyingKey };
+        recordScan({ at: Date.now(), underlyingKey, expiry: scan.expiry, candidateCount: scan.candidates.length, top: top ? { symbol: top.symbol, side: top.side, score: top.volatilityScore, changePct: top.changePct, spreadPct: top.spreadPct } : null, observation });
+        if (top) best.push(top);
+      } catch (error) {
+        recordScan({ at: Date.now(), underlyingKey, error: error.message, candidateCount: 0 });
+      }
+    }
+    best.sort((a,b) => b.volatilityScore - a.volatilityScore);
+    const candidate = best.find(c => c.volatilityScore >= 70 && c.changePct >= 3 && c.spreadPct <= 3.5 && c.volume >= 1000 && c.oi >= 10000 && !hasEnteredUnderlyingToday(c.underlyingKey, day));
+    if (candidate) {
+      const result = openOptionsPaper(candidate);
+      if (result.opened) {
+        markUnderlyingEnteredToday(candidate.underlyingKey, day);
+        recordAutopilotTrade({
+          id: result.position.id, openedAt: result.position.openedAt, status: "open",
+          underlyingKey: candidate.underlyingKey, symbol: candidate.symbol, side: candidate.side,
+          entry: result.position.entry, quantity: result.position.quantity, lots: result.position.lots,
+          stop: result.position.stop, target: result.position.target, score: candidate.volatilityScore,
+          changePct: candidate.changePct, iv: candidate.iv, volume: candidate.volume, oi: candidate.oi,
+          spreadPct: candidate.spreadPct,
+          reasons: ["Relative volatility score >= 70", "Option premium day change >= +3%", "Volume and OI filters passed", "Bid-ask spread <= 3.5%", "One entry per underlying per Indian market day"]
+        });
+      }
+    }
+  } catch (error) {
+    recordAutopilotError(error.message);
+    console.error("90-day paper cycle failed:", error.message);
+  } finally { autopilotBusy = false; }
+}
+app.get("/api/autopilot/status", (_req, res) => res.json({ ...getAutopilotStatus(), authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : accessToken ? "session_token" : "disconnected", watchlist: PAPER_UNDERLYINGS, watchlistCount: PAPER_UNDERLYINGS.length, batchSize: PAPER_BATCH_SIZE, scanIntervalMs: PAPER_SCAN_INTERVAL_MS }));
+app.post("/api/autopilot/start", (_req, res) => {
+  if (!accessToken) return res.status(401).json({ error: "Set UPSTOX_ANALYTICS_TOKEN in server environment first. The Analytics Token is read-only and supports market data." });
+  res.json(startAutopilot());
+  runAutopilotCycle().catch(error => recordAutopilotError(error.message));
+});
+app.post("/api/autopilot/stop", (_req, res) => res.json(stopAutopilot()));
+
 app.get("/api/options/search", async (req, res) => {
   if (!accessToken) return res.status(401).json({ error: "Connect Upstox first." });
   const query = String(req.query.q || "").trim().slice(0,50);
@@ -256,4 +382,6 @@ app.post("/api/trading/paper/mark", (req, res) => {
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
-app.listen(PORT, () => console.log(`Trading Intelligence AI running on port ${PORT}`));
+if (accessToken && process.env.PAPER_AUTOPILOT_ENABLED !== "false") { startAutopilot(); console.log("90-day options paper experiment enabled."); }
+setInterval(() => { runAutopilotCycle().catch(error => recordAutopilotError(error.message)); }, PAPER_SCAN_INTERVAL_MS);
+app.listen(PORT, () => console.log("Trading Intelligence AI running on port " + PORT));
