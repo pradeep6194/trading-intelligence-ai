@@ -44,3 +44,101 @@
 .setup-checklist{display:grid;gap:12px;margin:17px 0}.setup-checklist b,.setup-checklist small{display:block}.setup-checklist b{font-size:12px}.setup-checklist small{color:var(--muted);font-size:11px;margin-top:3px}
 .setup-links,.setup-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.setup-links a{text-decoration:none;display:inline-block}
 @media(max-width:650px){.setup-grid{grid-template-columns:1fr}.setup-links,.setup-actions{display:grid;grid-template-columns:1fr}.setup-links .btn,.setup-actions .btn{width:100%;text-align:center}}
+
+
+/* Clean layout pass — visual-only; preserves every existing page and control */
+:root{
+  --bg:#0a1220;--panel:#111d30;--panel2:#17263c;--line:#263750;
+  --text:#eef3fa;--muted:#94a3b8;--gold:#e9c27d;--teal:#62d8c2;
+}
+html{scroll-behavior:smooth}
+body{line-height:1.5;overflow-x:hidden}
+.app-shell{min-width:0}
+.main{min-width:0}
+.page{min-width:0;animation:page-in .18s ease-out}
+@keyframes page-in{from{opacity:.72;transform:translateY(3px)}to{opacity:1;transform:none}}
+.topbar{gap:14px}
+.topbar h1{letter-spacing:-.035em;font-weight:700}
+.section-head{gap:14px;align-items:center}
+.section-head>div{min-width:0}
+.section-head p{line-height:1.55;max-width:680px}
+.panel,.market-card,.learning-stat,.learn-card{box-shadow:0 8px 24px #00000012}
+.panel{border-radius:15px;padding:21px}
+.market-card{border-radius:14px;padding:18px}
+.panel-head{gap:12px}
+.panel-head h3,.section-head h3{letter-spacing:-.02em}
+.market-card b{letter-spacing:-.035em}
+.btn{min-height:40px;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+.btn:active,.nav:active{transform:scale(.98)}
+.btn-outline{border-color:#435570}
+input,select,textarea{max-width:100%}
+.notice{border-radius:12px}
+.table-scroll{max-width:100%;overscroll-behavior-x:contain}
+footer{line-height:1.6}
+@media(min-width:1100px){
+  .main{padding:32px 42px 28px}
+  .sidebar{width:246px;padding:28px 17px}
+  .nav{padding:12px 13px}
+  .page>.section-head:first-child{margin-top:8px}
+}
+@media(max-width:900px){
+  .main{padding:22px 20px}
+  .market-grid{gap:10px}
+  .panel{padding:18px}
+}
+@media(max-width:650px){
+  .app-shell{padding-bottom:76px}
+  .sidebar{
+    height:72px;padding:7px 9px calc(7px + env(safe-area-inset-bottom));
+    justify-content:flex-start;gap:5px;overflow-x:auto;overflow-y:hidden;
+    overscroll-behavior-x:contain;scrollbar-width:none;
+    -webkit-overflow-scrolling:touch;background:#0c1728f5;
+    backdrop-filter:blur(14px);border-top:1px solid #2b3d57;
+  }
+  .sidebar::-webkit-scrollbar{display:none}
+  .nav{
+    flex:0 0 66px;width:66px;min-width:66px;height:54px;margin:0;
+    padding:6px 3px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;border-radius:11px;font-size:17px;
+    scroll-snap-align:center;white-space:normal;
+  }
+  .nav span{
+    display:block;margin:0;max-width:64px;font-size:9px;line-height:1.1;
+    text-align:center;letter-spacing:-.01em;overflow-wrap:anywhere;
+  }
+  .nav.active{background:#1b2c45;color:var(--gold);box-shadow:inset 0 0 0 1px #b9934a35}
+  .main{padding:18px 14px 22px}
+  .topbar{align-items:center;margin-bottom:19px}
+  .topbar h1{font-size:22px}
+  .top-actions{gap:7px}
+  .top-actions #connectBtn{max-width:130px;white-space:nowrap}
+  .section-head{margin:24px 0 13px;align-items:flex-start}
+  .section-head h3{font-size:18px}
+  .section-head .muted{line-height:1.5}
+  .panel{padding:16px;border-radius:14px}
+  .market-card{padding:14px;border-radius:13px}
+  .market-card span{font-size:9px;letter-spacing:.7px}
+  .market-card b{font-size:20px;margin:7px 0 3px}
+  .market-grid{gap:9px}
+  .two-col,.paper-layout,.risk-layout,.classroom-layout{gap:10px;margin-top:12px}
+  .learning-grid{gap:9px}
+  .learn-card{border-radius:12px;min-height:104px}
+  .welcome{border-radius:15px;padding:22px 19px;min-height:220px}
+  .welcome h2{font-size:28px}
+  .welcome p{max-width:300px;font-size:12px}
+  .portfolio-row{gap:9px;flex-wrap:wrap}
+  .portfolio-row>div{min-width:28%}
+  .option-table-panel{padding:12px}
+  .option-controls{gap:10px}
+  .backtest-controls{gap:10px}
+  .notice{padding:12px;font-size:11px}
+  footer{padding:24px 2px 8px}
+}
+@media(max-width:380px){
+  .main{padding-left:11px;padding-right:11px}
+  .nav{flex-basis:62px;min-width:62px;width:62px}
+  .nav span{font-size:8px}
+  .topbar h1{font-size:20px}
+  .market-card b{font-size:18px}
+  .welcome h2{font-size:25px}
+}
