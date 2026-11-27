@@ -12,12 +12,14 @@ export function evaluateIntelligenceSuite(input={}) {
   const losses=closed.filter(t=>Number(t.pnl)<0).length;
   const directional=observations.filter(o=>o.forwardOutcome&&o.forwardOutcome.hypothesisOutcome!=="not_directional");
   const aligned=directional.filter(o=>o.forwardOutcome.hypothesisOutcome==="aligned").length;
-  const structureEvidence=[];
+  const research=input.research||{};
+  const ohlcv=research.structure||null;
+  const structureEvidence=[...(ohlcv?.evidence||[])];
   if(move!==null) structureEvidence.push("Spot movement since previous worker observation: "+move+"%.");
-  const structureStatus=move===null?"limited":"partial";
+  const structureStatus=ohlcv?.status==="available"?"available":move===null?"unavailable":"partial";
   const structure=module("market_structure","Market structure intelligence",structureStatus,null,
-    move===null?"No comparable prior spot observation.":Math.abs(move)>=0.1?(move>0?"Positive short-interval momentum observed.":"Negative short-interval momentum observed."):"No material short-interval direction detected.",
-    structureEvidence,["BOS/CHoCH, swing structure, order blocks, FVG and liquidity sweeps require OHLCV candle analysis; not inferred from option-chain snapshots."]);
+    ohlcv?.status==="available"?"OHLCV structure: "+ohlcv.bias+"; "+ohlcv.events.length+" BOS/CHoCH events detected.":move===null?"No comparable spot or candle evidence.":(move>0?"Positive":"Negative")+" short-interval spot momentum only.",
+    structureEvidence,[...(ohlcv?.limitations||[]),...(ohlcv?[]:["Multi-timeframe OHLCV candles are not available in this snapshot."])]);
   const optionEvidence=[];
   if(pcr!==null) optionEvidence.push("PCR "+pcr.toFixed(2));
   if(callOi!==null) optionEvidence.push("Call OI change "+callOi+"%");
@@ -28,15 +30,21 @@ export function evaluateIntelligenceSuite(input={}) {
   if(spread!==null) optionEvidence.push("Spread "+spread+"%");
   const options=module("options","Options intelligence",optionEvidence.length?"available":"unavailable",null,
     optionEvidence.length?"Option-chain positioning, premium and liquidity evidence captured.":"No option-chain evidence available.",optionEvidence);
-  const institutional=module("institutional","Institutional activity intelligence","unavailable",null,
-    "FII/DII cash flows, participant-wise derivatives positions and verified block/deal data are not connected.",
-    [],["Do not interpret aggregate option OI as confirmed institutional activity."]);
-  const breadth=module("market_wide","Market-wide intelligence","unavailable",null,
-    "Advance/decline, sector breadth, constituent contribution and cross-index relative strength feeds are not present in this worker snapshot.",
-    [],["Requires broad NSE quote/market breadth collection across the universe."]);
-  const news=module("news_events","News and event intelligence","unavailable",null,
-    "No verified newswire, exchange-announcement or economic-calendar feed is connected.",
-    [],["No catalyst or causal explanation will be invented from price movement."]);
+  const inst=research.institutional||null;
+  const institutional=module("institutional","Institutional activity intelligence",inst?.status||"unavailable",null,
+    inst?.status==="available"?"FII/DII reported activity loaded; latest records "+(inst.fii?.length||0)+" FII and "+(inst.dii?.length||0)+" DII.":"Institutional activity feed unavailable.",
+    [...(inst?.fii||[]).slice(0,3).map(x=>"FII "+x.segment+" net ₹"+x.netAmount),...(inst?.dii||[]).slice(0,2).map(x=>"DII "+x.segment+" net ₹"+x.netAmount)],
+    inst?.limitations||["Do not interpret aggregate option OI as confirmed institutional activity."]);
+  const br=research.breadth||null;
+  const breadth=module("market_wide","Market-wide intelligence",br?.status||"unavailable",null,
+    br?.status==="available"?"Sampled breadth "+br.bias+": "+br.advances+" advances / "+br.declines+" declines from "+br.sampleSize+" instruments.":"Market breadth quote sample unavailable.",
+    br?.status==="available"?["A/D ratio "+(br.advanceDeclineRatio??"undefined"),"Breadth differential "+br.breadthPct+"%"]:[],
+    br?.limitations||["No quote rows available."]);
+  const newsItems=research.news||[];
+  const news=module("news_events","News and event intelligence",newsItems.length?"available":"unavailable",null,
+    newsItems.length?newsItems.length+" timestamped Upstox News API items verified against provider article links.":"No verified instrument news returned in the latest request.",
+    newsItems.slice(0,5).map(x=>x.headline+" ("+x.instrumentKey+")"),
+    ["News endpoint covers the past seven days and only requested instruments.","Provider publication and link provenance are checked; headlines are not treated as confirmed causal catalysts."]);
   const pattern=module("pattern_discovery","Historical pattern discovery",observations.length>=20?"research_ready":"insufficient_history",null,
     observations.length>=20?"Historical observations are available for later regime-conditioned pattern tests.":"Need at least 20 comparable observations; no pattern claim is made yet.",
     ["Stored observations available: "+observations.length],["A valid pattern requires out-of-sample testing, costs and adequate sample size."]);
@@ -73,7 +81,7 @@ export function evaluateIntelligenceSuite(input={}) {
     reason: bias==="neutral"?"Insufficient aligned independent evidence; no directional paper decision from the integrated layer.":"Directional hypothesis only; the existing paper strategy and risk gates remain authoritative.",
     liveTradingEnabled:false
   };
-  return {version:1,at:Date.now(),modules,decision,
+  return {version:2,at:Date.now(),research,modules,decision,
     dataQuality:{availableModules:modules.filter(m=>m.status==="available"||m.status==="partial"||m.status==="research_ready").length,
       totalModules:10,unavailableModules:modules.filter(m=>m.status==="unavailable").map(m=>m.id)},
     guardrails:["No live orders.","Missing data is labelled unavailable, never imputed.","A module score is not a probability.","Existing paper-trading risk rules remain authoritative."]};
