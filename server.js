@@ -297,13 +297,71 @@ async function runAutopilotCycle() {
     console.error("90-day paper cycle failed:", error.message);
   } finally { autopilotBusy = false; }
 }
-app.get("/api/autopilot/status", (_req, res) => res.json({ ...getAutopilotStatus(), authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : accessToken ? "session_token" : "disconnected", watchlist: PAPER_UNDERLYINGS, watchlistCount: PAPER_UNDERLYINGS.length, batchSize: PAPER_BATCH_SIZE, scanIntervalMs: PAPER_SCAN_INTERVAL_MS }));
-app.post("/api/autopilot/start", (_req, res) => {
-  if (!accessToken) return res.status(401).json({ error: "Set UPSTOX_ANALYTICS_TOKEN in server environment first. The Analytics Token is read-only and supports market data." });
-  res.json(startAutopilot());
-  runAutopilotCycle().catch(error => recordAutopilotError(error.message));
+async function readSupabaseExperiment() {
+  const base = (process.env.SUPABASE_URL || "").replace(/\/$/, "");
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!base || !key) throw new Error("Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Render Environment.");
+  const r = await fetch(base + "/rest/v1/trading_state?id=eq.1&select=payload", { headers: { apikey: key, Authorization: "Bearer " + key } });
+  if (!r.ok) throw new Error("Supabase read failed (" + r.status + "). Check table setup and service-role key.");
+  const rows = await r.json();
+  return { base, key, payload: rows[0]?.payload || { version: 1, optionsPaper: null, autopilot: null } };
+}
+async function writeSupabaseExperiment(base, key, payload) {
+  const r = await fetch(base + "/rest/v1/trading_state?on_conflict=id", {
+    method: "POST", headers: { apikey: key, Authorization: "Bearer " + key, "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ id: 1, payload, updated_at: new Date().toISOString() })
+  });
+  if (!r.ok) throw new Error("Supabase write failed (" + r.status + "): " + (await r.text()).slice(0, 300));
+}
+function summarizeExperiment(a = {}) {
+  const trades = a.trades || [], closed = trades.filter(t => t.status !== "open");
+  const wins = closed.filter(t => Number(t.pnl) > 0);
+  const pnl = closed.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+  const groups = new Map();
+  for (const t of closed) {
+    const side = t.side || "unknown", g = groups.get(side) || { side, trades: 0, wins: 0, pnl: 0 };
+    g.trades++; if (Number(t.pnl) > 0) g.wins++; g.pnl += Number(t.pnl || 0); groups.set(side, g);
+  }
+  const elapsed = a.startedAt ? Math.max(0, Date.now() - a.startedAt) : 0;
+  const days = a.startedAt ? Math.min(90, Math.floor(elapsed / 86400000) + 1) : 0;
+  return {
+    active: Boolean(a.active), startedAt: a.startedAt || null, endsAt: a.startedAt ? a.startedAt + 90 * 86400000 : null,
+    calendarDaysElapsed: days, calendarDaysRemaining: Math.max(0, 90 - days),
+    scanCount: (a.scans || []).length, lastScanAt: a.lastScanAt || null, lastError: a.lastError || null,
+    lastWorkerAt: a.lastWorkerAt || null, lastWorkerResult: a.lastWorkerResult || null,
+    tradeCount: trades.length, closedTrades: closed.length,
+    winRate: closed.length ? Number((wins.length / closed.length * 100).toFixed(1)) : null,
+    realizedPnl: Number(pnl.toFixed(2)),
+    learningSummary: [...groups.values()].map(g => ({ ...g, winRate: Number((g.wins / g.trades * 100).toFixed(1)), averagePnl: Number((g.pnl / g.trades).toFixed(2)), pnl: Number(g.pnl.toFixed(2)) })),
+    observations: (a.observations || []).slice(-20).reverse(),
+    recentScans: (a.scans || []).slice(-10).reverse(), recentTrades: trades.slice(-50).reverse()
+  };
+}
+app.get("/api/autopilot/status", async (_req, res) => {
+  try {
+    const db = await readSupabaseExperiment(), a = db.payload.autopilot || {};
+    res.json({ ...summarizeExperiment(a), authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions", watchlistCount: a.universeCount || 0, batchSize: 10, scanIntervalMs: 300000 });
+  } catch (e) { res.status(503).json({ error: e.message, storage: "not_configured" }); }
 });
-app.post("/api/autopilot/stop", (_req, res) => res.json(stopAutopilot()));
+app.post("/api/autopilot/start", async (_req, res) => {
+  try {
+    if (!process.env.UPSTOX_ANALYTICS_TOKEN) return res.status(401).json({ error: "Add UPSTOX_ANALYTICS_TOKEN to GitHub Actions secrets and Render Environment. Use the read-only Analytics Token." });
+    const db = await readSupabaseExperiment();
+    const a = db.payload.autopilot || { scans: [], trades: [], observations: [], enteredToday: {} };
+    if (!a.startedAt) a.startedAt = Date.now();
+    if (Date.now() >= a.startedAt + 90 * 86400000) return res.status(409).json({ error: "This 90-day experiment has ended. Start a new experiment by resetting its Supabase row." });
+    a.active = true; a.lastError = null; db.payload.autopilot = a;
+    await writeSupabaseExperiment(db.base, db.key, db.payload);
+    res.json({ ...summarizeExperiment(a), active: true, authMode: "analytics_token", storage: "supabase", worker: "github-actions" });
+  } catch (e) { res.status(503).json({ error: e.message }); }
+});
+app.post("/api/autopilot/stop", async (_req, res) => {
+  try {
+    const db = await readSupabaseExperiment(), a = db.payload.autopilot || { scans: [], trades: [], observations: [] };
+    a.active = false; db.payload.autopilot = a; await writeSupabaseExperiment(db.base, db.key, db.payload);
+    res.json({ ...summarizeExperiment(a), active: false, authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions" });
+  } catch (e) { res.status(503).json({ error: e.message }); }
+});
 
 app.get("/api/options/search", async (req, res) => {
   if (!accessToken) return res.status(401).json({ error: "Connect Upstox first." });
@@ -382,6 +440,5 @@ app.post("/api/trading/paper/mark", (req, res) => {
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
-if (accessToken && process.env.PAPER_AUTOPILOT_ENABLED !== "false") { startAutopilot(); console.log("90-day options paper experiment enabled."); }
-setInterval(() => { runAutopilotCycle().catch(error => recordAutopilotError(error.message)); }, PAPER_SCAN_INTERVAL_MS);
+// Scheduled paper scans run in GitHub Actions; this Render process only serves the dashboard.
 app.listen(PORT, () => console.log("Trading Intelligence AI running on port " + PORT));
