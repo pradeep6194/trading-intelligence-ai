@@ -63,7 +63,9 @@ async function collectResearch(batch, token, prior, marketUniverse = { equityKey
   for(const chunk of quoteChunks){const q=new URL("https://api.upstox.com/v3/market-quote/quotes");q.searchParams.set("instrument_key",chunk.join(","));const d=await fetchOptional(q);if(d?.data){Object.assign(quoteData,d.data);successfulQuoteChunks++;}}
   const institutional=summariseInstitutionalFlows(fii,dii);
   const news=normaliseVerifiedNews(newsPayload);
-  const breadth=analyseMarketBreadth(quoteData);\n  breadth.coverage={requestedEquities:(marketUniverse.equityKeys||[]).length,successfulQuoteChunks,totalQuoteChunks:quoteChunks.length,universe:"NSE cash equity instrument master"};\n  const sectorBreadth=analyseSectorBreadth(quoteData,marketUniverse.sectorMap||{});
+  const breadth=analyseMarketBreadth(quoteData);
+  breadth.coverage={requestedEquities:(marketUniverse.equityKeys||[]).length,successfulQuoteChunks,totalQuoteChunks:quoteChunks.length,universe:"NSE cash equity instrument master"};
+  const sectorBreadth=analyseSectorBreadth(quoteData,marketUniverse.sectorMap||{});
   const structures={};
   for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]) {
     const candlesByTimeframe={};
@@ -75,9 +77,24 @@ async function collectResearch(batch, token, prior, marketUniverse = { equityKey
     const timeframeResults=Object.fromEntries(Object.entries(candlesByTimeframe).map(([tf,rows])=>[tf,analyseOhlcvStructure(rows,{timeframe:tf})]));
     structures[key]=timeframeResults;
   }
-  return {at:Date.now(),provider:"Upstox",institutional,breadth,news,structures,
-    freshness:{institutionalAt:institutional.latestFiiAt||institutional.latestDiiAt||null,newsAt:news.length?news[0].publishedAt:null,quotesAt:quotePayload?Date.now():null,candlesAt:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?Date.now():null},
-    feedStatus:{institutional:institutional.status,breadth:breadth.status,news:news.length?"available":"unavailable",ohlcv:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?"available":"unavailable"}};
+  const backtests={};
+  const today=indiaDate(); const from=new Date(Date.now()-30*86400000).toLocaleDateString("en-CA",{timeZone:"Asia/Kolkata"});
+  for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]){
+    const url=new URL("https://api.upstox.com/v3/historical-candle/"+encodeURIComponent(key)+"/minutes/5/"+today+"/"+from);
+    const hist=await fetchOptional(url);
+    backtests[key]=hist?.data?.candles?backtestStructure(hist.data.candles,{horizon:3,costBps:10}):{status:"unavailable",limitations:["Historical 5-minute candle API did not return data."]};
+  }
+  let exchangeAnnouncements=null;
+  try{
+    const nse=new URL("https://www.nseindia.com/api/corporate-announcements");
+    nse.searchParams.set("index","equities");nse.searchParams.set("from_date",today);nse.searchParams.set("to_date",today);
+    const response=await fetch(nse,{headers:{Accept:"application/json, text/plain, */*","User-Agent":"Mozilla/5.0","Referer":"https://www.nseindia.com/companies-listing/corporate-filings-announcements","Accept-Language":"en-US,en;q=0.9"}});
+    if(response.ok){const body=await response.json();exchangeAnnouncements=Array.isArray(body)?body:(body.data||[]);}
+    else console.warn("NSE official announcements unavailable: HTTP "+response.status);
+  }catch(error){console.warn("NSE official announcements unavailable:",error.message);}
+  return {at:Date.now(),provider:"Upstox + NSE official announcements",institutional,breadth,sectorBreadth,news,exchangeAnnouncements,backtests,structures,
+    freshness:{institutionalAt:institutional.latestFiiAt||institutional.latestDiiAt||null,newsAt:news.length?news[0].publishedAt:null,quotesAt:successfulQuoteChunks?Date.now():null,candlesAt:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?Date.now():null},
+    feedStatus:{institutional:institutional.status,breadth:breadth.status,sectorBreadth:Object.keys(sectorBreadth).length?"available":"unavailable",exchangeAnnouncements:exchangeAnnouncements?"available":"unavailable",backtest:Object.values(backtests).some(x=>x.status==="research_ready")?"available":"insufficient_history",news:news.length?"available":"unavailable",ohlcv:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?"available":"unavailable"}};
 }
 function validKey(k) { return /^(NSE_INDEX\|[A-Za-z0-9 .&-]+|NSE_EQ\|[A-Z0-9]+)$/.test(String(k || "")); }
 async function discoverUniverse() {
@@ -159,7 +176,8 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
-  const marketUniverse = await discoverMarketUniverse();\n  const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
+  const marketUniverse = await discoverMarketUniverse();
+  const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
   payload.autopilot.latestResearch = research;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   for (const underlyingKey of batch) {
