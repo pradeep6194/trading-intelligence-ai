@@ -1,7 +1,7 @@
 name: Node tests
 on:
   push:
-    branches: [main, feature/options-chain-paper-trading]
+    branches: [main, feature/options-chain-paper-trading, feature/adaptive-market-learning]
   pull_request:
     branches: [main]
 jobs:
