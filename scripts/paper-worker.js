@@ -55,11 +55,16 @@ async function scanUnderlying(key, rankOptionChain) {
   const oUrl = new URL("https://api.upstox.com/v2/option/chain"); oUrl.searchParams.set("instrument_key", key); oUrl.searchParams.set("expiry_date", expiry);
   const chain = (await upstox(oUrl)).data || [];
   const ranked = rankOptionChain(chain, contracts.filter(x => x.expiry === expiry), { minVolume: 1000, minOi: 10000, maxSpreadPct: 3.5, maxDistancePct: 5 });
-  const callOi = chain.reduce((sum, row) => sum + Number(row.call_options?.market_data?.oi || 0), 0);
-  const putOi = chain.reduce((sum, row) => sum + Number(row.put_options?.market_data?.oi || 0), 0);
+  const oiTotals = side => chain.reduce((sum, row) => {
+    const md = row[side + "_options"]?.market_data || {};
+    return { oi: sum.oi + Number(md.oi || 0), previousOi: sum.previousOi + Number(md.prev_oi || 0) };
+  }, { oi: 0, previousOi: 0 });
+  const calls = oiTotals("call"), puts = oiTotals("put");
+  const callOi = calls.oi, putOi = puts.oi;
+  const callOiChange = callOi - calls.previousOi, putOiChange = putOi - puts.previousOi;
   const spot = Number(chain[0]?.underlying_spot_price || 0);
   const pcr = Number(chain[0]?.pcr || (callOi > 0 ? putOi / callOi : 0));
-  return { expiry, spot, pcr, callOi, putOi, ...ranked };
+  return { expiry, spot, pcr, callOi, putOi, callOiChange, putOiChange, ...ranked };
 }
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "trading-intelligence-"));
 process.env.DATA_DIR = dataDir;
@@ -89,9 +94,14 @@ const { recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotE
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
-  const start = Number(payload.autopilot.scanCursor || 0) % universe.length;
-  const batch = Array.from({ length: Math.min(batchSize, universe.length) }, (_, i) => universe[(start + i) % universe.length]);
-  payload.autopilot.scanCursor = (start + batch.length) % universe.length;
+  // Re-scan the two benchmark indices on every cycle; rotate the stock F&O universe in the remaining slots.
+  const benchmarks = ["NSE_INDEX|Nifty 50", "NSE_INDEX|Nifty Bank"].filter(k => universe.includes(k));
+  const stocks = universe.filter(k => !benchmarks.includes(k));
+  const stockSlots = Math.max(0, batchSize - benchmarks.length);
+  const start = stocks.length ? Number(payload.autopilot.scanCursor || 0) % stocks.length : 0;
+  const rotating = Array.from({ length: Math.min(stockSlots, stocks.length) }, (_, i) => stocks[(start + i) % stocks.length]);
+  const batch = [...benchmarks, ...rotating];
+  payload.autopilot.scanCursor = stocks.length ? (start + rotating.length) % stocks.length : 0;
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
@@ -104,20 +114,30 @@ try {
       stored.autopilot.marketSnapshots ||= {};
       const previous = stored.autopilot.marketSnapshots[underlyingKey];
       const spotChangePct = previous?.spot > 0 && result.spot > 0 ? Number(((result.spot - previous.spot) / previous.spot * 100).toFixed(3)) : null;
+      const pcrChange = previous?.pcr > 0 ? Number((result.pcr - previous.pcr).toFixed(3)) : null;
+      const callOiChangePct = previous?.callOi > 0 ? Number((result.callOiChange / previous.callOi * 100).toFixed(2)) : null;
+      const putOiChangePct = previous?.putOi > 0 ? Number((result.putOiChange / previous.putOi * 100).toFixed(2)) : null;
       const drivers = [];
-      if (spotChangePct !== null && Math.abs(spotChangePct) >= 0.15) drivers.push("Spot price moved " + (spotChangePct > 0 ? "up " : "down ") + Math.abs(spotChangePct) + "% since the prior scan");
-      if (result.pcr >= 1.2) drivers.push("Put OI exceeds call OI (PCR " + result.pcr.toFixed(2) + ")");
-      else if (result.pcr > 0 && result.pcr <= 0.8) drivers.push("Call OI exceeds put OI (PCR " + result.pcr.toFixed(2) + ")");
-      if (top?.changePct >= 3) drivers.push("Top option premium is up " + top.changePct.toFixed(2) + "% on the day");
-      if (top?.iv >= 35) drivers.push("Elevated implied volatility (" + top.iv.toFixed(1) + "%)");
+      let regime = "mixed / no clear signal";
+      if (spotChangePct !== null && Math.abs(spotChangePct) >= 0.10) {
+        drivers.push("Underlying spot " + (spotChangePct > 0 ? "rose " : "fell ") + Math.abs(spotChangePct) + "% since the previous 5-minute scan");
+        regime = spotChangePct > 0 ? "positive price momentum" : "negative price momentum";
+      }
+      if (result.pcr >= 1.2) drivers.push("Put OI is larger than call OI (PCR " + result.pcr.toFixed(2) + "); this can reflect put positioning, not guaranteed support");
+      else if (result.pcr > 0 && result.pcr <= 0.8) drivers.push("Call OI is larger than put OI (PCR " + result.pcr.toFixed(2) + "); this can reflect call positioning, not guaranteed resistance");
+      if (pcrChange !== null && Math.abs(pcrChange) >= 0.05) drivers.push("PCR changed " + (pcrChange > 0 ? "higher" : "lower") + " by " + Math.abs(pcrChange).toFixed(2) + " since the previous scan");
+      if (callOiChangePct !== null && Math.abs(callOiChangePct) >= 0.5) drivers.push("Aggregate call OI " + (callOiChangePct > 0 ? "increased " : "decreased ") + Math.abs(callOiChangePct) + "% versus the previous scan");
+      if (putOiChangePct !== null && Math.abs(putOiChangePct) >= 0.5) drivers.push("Aggregate put OI " + (putOiChangePct > 0 ? "increased " : "decreased ") + Math.abs(putOiChangePct) + "% versus the previous scan");
+      if (top?.changePct >= 3) drivers.push("Leading option premium is up " + top.changePct.toFixed(2) + "% on the day");
+      if (top?.iv >= 35) drivers.push("Elevated implied volatility (" + top.iv.toFixed(1) + "%), indicating higher option-implied uncertainty");
       if (top && top.volume >= 10000) drivers.push("High traded volume in the leading contract");
-      if (!drivers.length) drivers.push("No strong directional or positioning imbalance detected from available fields");
+      if (!drivers.length) drivers.push("No material price or positioning change detected in the fields available for this scan");
       const observation = {
         at: Date.now(), underlyingKey, symbol: top?.symbol || null, score: top?.volatilityScore ?? null,
         changePct: top?.changePct ?? null, iv: top?.iv ?? null, volume: top?.volume ?? null,
-        oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null,
+        oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null, regime,
         spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi,
-        evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi },
+        evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange, callOi: result.callOi, putOi: result.putOi, callOiChange: result.callOiChange, putOiChange: result.putOiChange, callOiChangePct, putOiChangePct },
         drivers, summary: top
           ? underlyingKey + ": leading " + top.side + " contract " + top.symbol + " scored " + top.volatilityScore + "/100. Observed premium change " + top.changePct + "%."
           : underlyingKey + ": no option contract passed the configured liquidity filters.",
