@@ -11,20 +11,26 @@ function render(d){
  $("learnPnl").textContent="₹"+num(d.realizedPnl);
  $("learnWin").textContent=d.winRate==null?"—":num(d.winRate,1)+"%";
  const rows=d.observations||[];
+ const evaluated=rows.filter(x=>x.forwardOutcome&&x.forwardOutcome.hypothesisOutcome!=="not_directional");
+ const aligned=evaluated.filter(x=>x.forwardOutcome.hypothesisOutcome==="aligned").length;
+ const hitRate=evaluated.length?aligned/evaluated.length*100:null;
+ const latest=rows.find(x=>x.analysis);
+ $("learnModelSummary").innerHTML=latest?'<div class="learn-model-grid"><div><small>Latest regime</small><b>'+esc(latest.analysis.regime)+'</b></div><div><small>Directional bias</small><b>'+esc(latest.analysis.directionalBias)+'</b></div><div><small>Confidence</small><b>'+esc(latest.analysis.confidence)+'</b></div><div><small>Hypothesis checks</small><b>'+evaluated.length+'</b></div><div><small>Aligned outcomes</small><b>'+(hitRate==null?"—":num(hitRate,1)+"%")+'</b></div></div><p>'+esc(latest.analysis.hypothesis)+'</p><small class="learn-note">Next-scan directional alignment only; not trade win rate or validated predictive accuracy.</small>':"Waiting for the first structured market observation.";
  $("learnFeed").innerHTML=rows.length?rows.map(x=>{
-  const ev=x.evidence||{}, drivers=x.drivers||[];
+  const ev=x.evidence||{}, drivers=x.drivers||[], a=x.analysis||{}, outcome=x.forwardOutcome||null;
   return '<article class="learn-event"><div class="learn-event-top"><b>'+esc(x.underlyingKey||x.symbol||"NSE instrument")+'</b><time>'+new Date(x.at||0).toLocaleString("en-IN")+'</time></div>'+
-  '<div class="learn-regime">'+esc(x.regime||"market evidence")+'</div>'+
+  (a.regime?'<div class="learn-regime">'+esc(a.regime)+' · '+esc(a.directionalBias||"neutral")+' · '+esc(a.confidence||"low")+'</div>':'')+
   '<p>'+esc(x.summary||x.text||"Scan recorded.")+'</p>'+
+  (a.hypothesis?'<p><b>Hypothesis:</b> '+esc(a.hypothesis)+'</p>':'')+
+  (outcome?'<div class="learn-drivers"><span>Next scan: '+esc(outcome.hypothesisOutcome)+'</span><span>Spot move: '+num(outcome.forwardMovePct,3)+'%</span></div>':'')+
   (drivers.length?'<div class="learn-drivers">'+drivers.map(v=>'<span>'+esc(v)+'</span>').join("")+'</div>':'')+
-  '<div class="learn-metrics">'+
-  '<span>Spot '+num(ev.spot)+'</span><span>Spot Δ / 5m '+(ev.spotChangePct==null?"—":num(ev.spotChangePct)+"%")+'</span>'+
+  '<div class="learn-metrics"><span>Spot '+num(ev.spot)+'</span><span>Spot Δ / 5m '+(ev.spotChangePct==null?"—":num(ev.spotChangePct)+"%")+'</span>'+
   '<span>PCR '+num(ev.pcr,2)+'</span><span>PCR Δ '+(ev.pcrChange==null?"—":num(ev.pcrChange,2))+'</span>'+
   '<span>Call OI Δ '+(ev.callOiChangePct==null?"—":num(ev.callOiChangePct)+"%")+'</span><span>Put OI Δ '+(ev.putOiChangePct==null?"—":num(ev.putOiChangePct)+"%")+'</span>'+
   '<span>Top premium Δ '+(x.changePct==null?"—":num(x.changePct)+"%")+'</span><span>IV '+num(x.iv,1)+'</span>'+
   '<span>Volume '+num(x.volume,0)+'</span><span>Score '+num(x.score,0)+'/100</span></div>'+
-  '<small class="learn-note">Evidence-based interpretation of price, option positioning and liquidity. This cannot verify a news catalyst or prove causation.</small></article>';
- }).join(""):'<div class="history-empty">No learning observations yet. Start the 90-day paper experiment and the cloud worker will populate this page during NSE market hours.</div>';
+  '<small class="learn-note">'+esc(a.caution||"Evidence-based interpretation; not proof of a news catalyst or causation.")+'</small></article>';
+ }).join(""):'<div class="history-empty">No learning observations yet. Start the 90-day paper experiment to populate this page during NSE market hours.</div>';
  $("learnTradesList").innerHTML=(d.recentTrades||[]).length?d.recentTrades.slice(0,20).map(t=>'<div class="learn-trade"><b>'+esc(t.symbol)+'</b><span>'+esc(t.status)+'</span><span>₹'+num(t.pnl||0)+'</span><small>'+esc((t.reasons||[]).join(" · ")||t.outcomeReason||"No trade rationale recorded")+'</small></div>').join(""):"No paper-trade outcomes yet. The system needs completed observations and trades before it can measure which setups worked.";
  $("learnError").textContent=d.lastError?"Last worker error: "+d.lastError:"";
 }
