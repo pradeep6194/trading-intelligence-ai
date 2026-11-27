@@ -147,5 +147,23 @@ app.get("/api/candles", async (req, res) => {
     const data=await response.json();res.status(response.status).json(data);
   } catch(e){res.status(502).json({error:e.message});}
 });
+
+import { analyseMarket, autoPaperTrade, markPaperPosition, paperStatus } from "./trading/engine.js";
+
+// Paper-only trading API. No broker order placement is exposed.
+app.get("/api/trading/status", (_req, res) => res.json(paperStatus()));
+app.post("/api/trading/analyze", (req, res) => {
+  try { res.json(analyseMarket(req.body || {})); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/trading/paper/auto", (req, res) => {
+  try { res.json(autoPaperTrade(analyseMarket(req.body || {}))); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post("/api/trading/paper/mark", (req, res) => {
+  try { res.json(markPaperPosition(req.body?.market, req.body?.price)); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
 app.listen(PORT, () => console.log(`Trading Intelligence AI running on port ${PORT}`));
