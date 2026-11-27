@@ -10,3 +10,29 @@
 #btChart{display:block;max-width:100%}
 @media(max-width:760px){.backtest-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:390px){.backtest-controls{grid-template-columns:1fr}}
+
+/* Trading psychology coach */
+.psyche-gate{margin-bottom:16px;border-color:#5a4b2f;background:linear-gradient(110deg,#211f1b,#111c2e)}
+.psy-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.psy-field,.psy-form label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:12px;margin:13px 0}
+.psy-field input,.psy-field select,.psy-form input,.psy-form select,.psy-form textarea{width:100%;min-width:0;background:#0b1525;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:11px;font:inherit}
+.psy-checks{display:grid;gap:11px;padding:14px 0}
+.psy-checks label{display:flex;gap:10px;align-items:flex-start;color:#c4cfdd;font-size:12px;line-height:1.5}
+.psy-checks input{accent-color:var(--gold);margin-top:2px;min-width:17px;min-height:17px}
+.psy-result{margin-top:12px;border:1px solid var(--line);border-radius:9px;padding:13px;color:var(--muted);font-size:12px;line-height:1.6}
+.psy-result.good{border-color:#2d765f;color:#8fe0be;background:#102a28}
+.psy-result.warn{border-color:#8a6332;color:#f1cf88;background:#2a2115}
+.psy-result.bad{border-color:#8e454b;color:#ffb0b4;background:#2b181e}
+.psy-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
+.psy-form label:last-of-type{grid-column:1/-1}
+.psy-form button{grid-column:1/-1}
+.psy-metrics{grid-template-columns:repeat(4,minmax(0,1fr));margin:12px 0 16px}
+.psy-history{display:grid;gap:9px;margin-top:12px}
+.psy-log-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;padding:10px;border-bottom:1px solid var(--line);font-size:11px;color:#c1cada}
+.psy-log-row small{display:block;color:var(--muted);margin-top:3px}
+.book-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.book-card{background:#0e192a;border:1px solid var(--line);border-radius:10px;padding:14px}
+.book-card b{color:var(--gold);font-size:13px}
+.book-card p{color:#c4cfdd;font-size:12px;line-height:1.6}
+.book-card small{display:block;color:var(--muted);font-size:11px;line-height:1.55}
+@media(max-width:760px){.psy-grid{grid-template-columns:1fr}.psy-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.book-grid{grid-template-columns:1fr}.psy-form{grid-template-columns:1fr}.psy-form label:last-of-type,.psy-form button{grid-column:auto}.psy-log-row{grid-template-columns:1fr 1fr}}
