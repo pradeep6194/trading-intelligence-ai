@@ -36,7 +36,9 @@ export function evaluateIntelligenceSuite(input={}) {
     inst?.status==="available"?"FII/DII reported activity loaded; latest records "+(inst.fii?.length||0)+" FII and "+(inst.dii?.length||0)+" DII.":"Institutional activity feed unavailable.",
     [...(inst?.fii||[]).slice(0,3).map(x=>"FII "+x.segment+" net ₹"+x.netAmount),...(inst?.dii||[]).slice(0,2).map(x=>"DII "+x.segment+" net ₹"+x.netAmount)],
     inst?.limitations||["Do not interpret aggregate option OI as confirmed institutional activity."]);
-  const br=research.breadth||null;\n  const sectors=research.sectorBreadth||{};\n  const sectorEvidence=Object.entries(sectors).map(([name,x])=>name+": "+x.bias+" ("+x.advances+"/"+x.declines+")");
+  const br=research.breadth||null;
+  const sectors=research.sectorBreadth||{};
+  const sectorEvidence=Object.entries(sectors).map(([name,x])=>name+": "+x.bias+" ("+x.advances+"/"+x.declines+")");
   const breadth=module("market_wide","Market-wide intelligence",br?.status||"unavailable",null,
     br?.status==="available"?"Sampled breadth "+br.bias+": "+br.advances+" advances / "+br.declines+" declines from "+br.sampleSize+" instruments.":"Market breadth quote sample unavailable.",
     br?.status==="available"?["A/D ratio "+(br.advanceDeclineRatio??"undefined"),"Breadth differential "+br.breadthPct+"%"]:[],
