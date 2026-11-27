@@ -130,11 +130,13 @@ app.get("/api/candles", async (req, res) => {
   if(!((unit==="minutes" && /^(1|2|3|5|10|15|30)$/.test(interval)) || (unit==="hours" && /^(1|2|3|4|5)$/.test(interval)) || (unit==="days" && interval==="1"))) return res.status(400).json({error:"Unsupported candle timeframe."});
   try {
     const range=String(req.query.range||"today");
-    const isoDate=v=>/^\\d{4}-\\d{2}-\\d{2}$/.test(String(v||"")) && !Number.isNaN(Date.parse(String(v)+"T00:00:00Z"));
+    const isoDate=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||"")) && !Number.isNaN(Date.parse(String(v)+"T00:00:00Z"));
     const customFrom=String(req.query.from_date||"");
     const customTo=String(req.query.to_date||"");
     if(range==="custom" && (!isoDate(customFrom)||!isoDate(customTo)||customFrom>customTo)) return res.status(400).json({error:"Valid from_date aur to_date (YYYY-MM-DD) select karein."});
-    const spanDays=(Date.parse(customTo)-Date.parse(customFrom))/86400000;\n    const maxDays=unit==="minutes"?(Number(interval)<=15?31:92):unit==="hours"?92:3660;\n    if(range==="custom" && spanDays>maxDays) return res.status(400).json({error:"Selected timeframe ke liye date range maximum "+maxDays+" days hai. Upstox V3 historical API limit follow karein."});
+    const spanDays=(Date.parse(customTo)-Date.parse(customFrom))/86400000;
+    const maxDays=unit==="minutes"?(Number(interval)<=15?31:92):unit==="hours"?92:3660;
+    if(range==="custom" && spanDays>maxDays) return res.status(400).json({error:"Selected timeframe ke liye date range maximum "+maxDays+" days hai. Upstox V3 historical API limit follow karein."});
     const intraday=range==="today";
     const toDate=range==="custom"?customTo:String(req.query.to_date||new Date().toISOString().slice(0,10));
     const fromDate=range==="custom"?customFrom:String(req.query.from_date||new Date(Date.now()-7*86400000).toISOString().slice(0,10));
