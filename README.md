@@ -53,6 +53,8 @@ Open `http://localhost:3000`.
 
 
 ## 90-day autonomous paper experiment (read-only market data)
+
+**Free deployment:** The experiment worker now runs as a scheduled GitHub Actions workflow and stores its state in Supabase. Render Free is only the dashboard; it does not need to stay awake. Follow [FREE_DEPLOYMENT.md](FREE_DEPLOYMENT.md). No Render disk or paid Render instance is required.
 - The Options Paper Desk can run a server-side NSE F&O scan every five minutes during weekday NSE market hours, even when the browser is closed. The worker downloads Upstox’s daily NSE instrument master and discovers current NSE F&O option underlyings (stock and index). It rotates through batches of 20 underlyings per scan cycle so the complete universe is covered over successive cycles. A fallback shortlist is used only if the instrument master cannot be loaded.
 - The worker uses a conservative momentum/liquidity gate before opening a simulated long CE/PE position. It never submits broker orders. It records scans, entry reasons, exits, P&L and simple measured summaries. These are rule-based observations, not self-modifying AI or a claim of predictive learning.
 - Configure `UPSTOX_ANALYTICS_TOKEN` in the Render service environment. Upstox Analytics Tokens are long-lived and read-only, and support market-data APIs including option chain and WebSocket. They do not permit trading orders. The ordinary OAuth access token expires at 3:30 AM the following day and cannot be kept alive by merely storing it.
