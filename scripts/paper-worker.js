@@ -36,6 +36,50 @@ function marketClock() {
 function indiaDate() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
+async function optionalUpstox(url) {
+  try { return await upstox(url); }
+  catch (error) { console.warn("Optional research feed unavailable:", new URL(url).pathname, error.message); return null; }
+}
+async function collectResearch(batch, token, prior) {
+  const { analyseOhlcvStructure, analyseMarketBreadth, summariseInstitutionalFlows, normaliseVerifiedNews } = await import("../trading/research-feeds.js");
+  const auth = { Accept:"application/json", Authorization:"Bearer "+token };
+  const fetchOptional = async url => {
+    try { const response=await fetch(url,{headers:auth}); if(!response.ok) throw new Error("HTTP "+response.status); return await response.json(); }
+    catch(error) { console.warn("Research feed unavailable:",new URL(url).pathname,error.message); return null; }
+  };
+  const fiiUrl=new URL("https://api.upstox.com/v2/market/fii");
+  for(const type of ["NSE_FO|INDEX_FUTURES","NSE_FO|STOCK_FUTURES","NSE_FO|INDEX_OPTIONS","NSE_FO|STOCK_OPTIONS","NSE_EQ|CASH"]) fiiUrl.searchParams.append("data_type",type);
+  fiiUrl.searchParams.set("interval","1D");
+  const diiUrl=new URL("https://api.upstox.com/v2/market/dii");
+  diiUrl.searchParams.set("data_type","NSE_EQ|CASH"); diiUrl.searchParams.set("interval","1D");
+  const stockKeys=batch.filter(k=>k.startsWith("NSE_EQ|")).slice(0,30);
+  const newsUrl=new URL("https://api.upstox.com/v2/news");
+  newsUrl.searchParams.set("category","instrument_keys"); newsUrl.searchParams.set("instrument_keys",stockKeys.join(","));
+  newsUrl.searchParams.set("page_number","1"); newsUrl.searchParams.set("page_size","100");
+  const quoteUrl=new URL("https://api.upstox.com/v3/market-quote/quotes");
+  quoteUrl.searchParams.set("instrument_key",batch.slice(0,500).join(","));
+  const [fii,dii,newsPayload,quotePayload]=await Promise.all([
+    fetchOptional(fiiUrl),fetchOptional(diiUrl),stockKeys.length?fetchOptional(newsUrl):Promise.resolve(null),fetchOptional(quoteUrl)
+  ]);
+  const quoteData=quotePayload?.data||{};
+  const institutional=summariseInstitutionalFlows(fii,dii);
+  const news=normaliseVerifiedNews(newsPayload);
+  const breadth=analyseMarketBreadth(quoteData);
+  const structures={};
+  for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]) {
+    const candlesByTimeframe={};
+    for(const [unit,interval,label] of [["minutes","5","5m"],["minutes","15","15m"],["hours","1","1h"],["days","1","1d"]]) {
+      const url=new URL("https://api.upstox.com/v3/historical-candle/intraday/"+encodeURIComponent(key)+"/"+unit+"/"+interval);
+      const payload=await fetchOptional(url);
+      if(payload?.data?.candles) candlesByTimeframe[label]=payload.data.candles;
+    }
+    const timeframeResults=Object.fromEntries(Object.entries(candlesByTimeframe).map(([tf,rows])=>[tf,analyseOhlcvStructure(rows,{timeframe:tf})]));
+    structures[key]=timeframeResults;
+  }
+  return {at:Date.now(),provider:"Upstox",institutional,breadth,news,structures,
+    freshness:{institutionalAt:institutional.latestFiiAt||institutional.latestDiiAt||null,newsAt:news.length?news[0].publishedAt:null,quotesAt:quotePayload?Date.now():null,candlesAt:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?Date.now():null},
+    feedStatus:{institutional:institutional.status,breadth:breadth.status,news:news.length?"available":"unavailable",ohlcv:Object.values(structures).some(x=>Object.values(x).some(y=>y.status==="available"))?"available":"unavailable"}};
+}
 function validKey(k) { return /^(NSE_INDEX\|[A-Za-z0-9 .&-]+|NSE_EQ\|[A-Z0-9]+)$/.test(String(k || "")); }
 async function discoverUniverse() {
   const r = await fetch("https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz");
@@ -107,6 +151,9 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
+  const research = await collectResearch(batch, token, payload.autopilot.latestResearch);
+  payload.autopilot.latestResearch = research;
+  fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   for (const underlyingKey of batch) {
     try {
       const result = await scanUnderlying(underlyingKey, rankOptionChain);
@@ -143,7 +190,7 @@ try {
         changePct: top?.changePct ?? null, iv: top?.iv ?? null, volume: top?.volume ?? null,
         oi: top?.oi ?? null, spreadPct: top?.spreadPct ?? null, regime: analysis.regime,
         spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi,
-        evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange, callOi: result.callOi, putOi: result.putOi, callOiChange: result.callOiChange, putOiChange: result.putOiChange, callOiChangePct, putOiChangePct },
+        evidence: { spot: result.spot, spotChangePct, pcr: result.pcr, pcrChange, callOi: result.callOi, putOi: result.putOi, callOiChange: result.callOiChange, putOiChange: result.putOiChange, callOiChangePct, putOiChangePct, researchFreshness: research.freshness },
         analysis, intelligence, drivers, summary: top
           ? underlyingKey + ": leading " + top.side + " contract " + top.symbol + " scored " + top.volatilityScore + "/100. Observed premium change " + top.changePct + "%."
           : underlyingKey + ": no option contract passed the configured liquidity filters.",
@@ -197,7 +244,7 @@ try {
   payload = JSON.parse(fs.readFileSync(dataFile, "utf8"));
   payload.autopilot.lastError = null;
   payload.autopilot.lastWorkerAt = Date.now();
-  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate) };
+  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate), researchFeeds: research.feedStatus };
   await dbWrite(payload);
   console.log("Paper scan completed:", JSON.stringify(payload.autopilot.lastWorkerResult));
 } catch (error) {

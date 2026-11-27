@@ -13,4 +13,5 @@ jobs:
         with:
           node-version: 20
       - run: npm install
+      - run: node --check server.js && node --check scripts/paper-worker.js
       - run: npm test
