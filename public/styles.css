@@ -36,3 +36,11 @@
 .book-card p{color:#c4cfdd;font-size:12px;line-height:1.6}
 .book-card small{display:block;color:var(--muted);font-size:11px;line-height:1.55}
 @media(max-width:760px){.psy-grid{grid-template-columns:1fr}.psy-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.book-grid{grid-template-columns:1fr}.psy-form{grid-template-columns:1fr}.psy-form label:last-of-type,.psy-form button{grid-column:auto}.psy-log-row{grid-template-columns:1fr 1fr}}
+
+/* Setup and connection health center */
+.setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.setup-card{min-width:0}.setup-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.setup-card p{line-height:1.55;margin:12px 0 0;overflow-wrap:anywhere}
+.setup-ok{border-color:#286b58;color:#7ce0b7}.setup-warn{border-color:#8a6a2e;color:#f0cb7e}.setup-bad{border-color:#87464b;color:#ff9a9f}
+.setup-checklist{display:grid;gap:12px;margin:17px 0}.setup-checklist b,.setup-checklist small{display:block}.setup-checklist b{font-size:12px}.setup-checklist small{color:var(--muted);font-size:11px;margin-top:3px}
+.setup-links,.setup-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.setup-links a{text-decoration:none;display:inline-block}
+@media(max-width:650px){.setup-grid{grid-template-columns:1fr}.setup-links,.setup-actions{display:grid;grid-template-columns:1fr}.setup-links .btn,.setup-actions .btn{width:100%;text-align:center}}
