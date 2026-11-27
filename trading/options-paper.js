@@ -84,6 +84,7 @@ export function openOptionsPaper(candidate) {
   if (state.locked) return { opened: false, reason: "Daily options risk lock is active.", status };
   if (status.tradesToday >= state.maxTradesPerDay) return { opened: false, reason: "Maximum five paper entries per day reached.", status };
   if (state.open.some(p => p.instrumentKey === candidate.instrumentKey)) return { opened: false, reason: "This contract already has an open paper position.", status };
+  if (state.open.length >= 2) return { opened: false, reason: "Maximum two simultaneous option paper positions allowed.", status };
   const entry = Number(candidate.ask), lotSize = Number(candidate.lotSize);
   if (!(entry > 0 && lotSize > 0)) throw new Error("Live ask price or lot size is missing.");
   const stop = Number((entry * 0.75).toFixed(2)), target = Number((entry * 1.5).toFixed(2));
@@ -126,5 +127,7 @@ export function closeOptionsPaper(instrumentKey, bidPrice) {
   const pnl = Number(((bid - p.entry) * p.quantity).toFixed(2));
   Object.assign(p, { exit: bid, pnl, status: "manual_exit", closedAt: Date.now() });
   state.open = state.open.filter(x => x.id !== p.id);
+  const realized = todayTrades().filter(t => t.status !== "open").reduce((s,t) => s + t.pnl, 0);
+  if (realized <= -(state.capital * state.dailyLossPct / 100)) state.locked = true;
   return { closed: true, trade: p, status: optionsPaperStatus() };
 }
