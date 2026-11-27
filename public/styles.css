@@ -2,3 +2,11 @@
 .option-controls{display:flex;gap:14px;align-items:end;margin:14px 0}.option-controls label{display:grid;gap:6px;color:var(--muted);font-size:11px;min-width:160px}.option-controls select{background:#0c1524;border:1px solid var(--line);border-radius:7px;color:var(--text);padding:10px}.option-stats{margin:12px 0}.option-table-panel{padding:14px}.table-scroll{overflow-x:auto;margin-top:12px}.option-table{width:100%;border-collapse:collapse;min-width:850px;font-size:10px;text-align:right}.option-table th,.option-table td{padding:9px 7px;border-bottom:1px solid var(--line);white-space:nowrap}.option-table thead th{color:var(--muted);font-size:9px;letter-spacing:.6px}.option-table .strike-cell{text-align:center;color:var(--gold);font-weight:800;background:#1a2a40}.option-table tbody tr:hover{background:#17263a}@media(max-width:650px){.option-controls{align-items:stretch;flex-direction:column}.option-controls label{width:100%}.option-controls select{width:100%}}
 
 .option-controls{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}.option-controls label{display:flex;flex-direction:column;gap:7px;color:var(--muted);font-size:11px;min-width:150px;flex:1}.option-controls select{background:#0c1524;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:11px}.ta-stats{grid-template-columns:repeat(4,1fr);margin:12px 0}.ta-interpret{margin-top:12px}.ta-interpret h3{color:var(--gold)}#taChart{display:block;margin-top:12px}@media(max-width:700px){.ta-stats{grid-template-columns:repeat(2,1fr)}.option-controls label{min-width:120px}}
+
+/* Backtesting Lab */
+.backtest-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.backtest-controls label{display:flex;flex-direction:column;gap:8px;color:var(--muted);font-size:13px}
+.backtest-controls input,.backtest-controls select{width:100%;min-width:0;background:#0b1525;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:13px;font:inherit}
+#btChart{display:block;max-width:100%}
+@media(max-width:760px){.backtest-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){.backtest-controls{grid-template-columns:1fr}}
