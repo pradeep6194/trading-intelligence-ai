@@ -40,8 +40,8 @@ async function optionalUpstox(url) {
   try { return await upstox(url); }
   catch (error) { console.warn("Optional research feed unavailable:", new URL(url).pathname, error.message); return null; }
 }
-async function collectResearch(batch, token, prior) {
-  const { analyseOhlcvStructure, analyseMarketBreadth, summariseInstitutionalFlows, normaliseVerifiedNews } = await import("../trading/research-feeds.js");
+async function collectResearch(batch, token, prior, marketUniverse = { equityKeys:[], sectorMap:{} }) {
+  const { analyseOhlcvStructure, analyseMarketBreadth, analyseSectorBreadth, backtestStructure, summariseInstitutionalFlows, normaliseVerifiedNews } = await import("../trading/research-feeds.js");
   const auth = { Accept:"application/json", Authorization:"Bearer "+token };
   const fetchOptional = async url => {
     try { const response=await fetch(url,{headers:auth}); if(!response.ok) throw new Error("HTTP "+response.status); return await response.json(); }
@@ -56,15 +56,14 @@ async function collectResearch(batch, token, prior) {
   const newsUrl=new URL("https://api.upstox.com/v2/news");
   newsUrl.searchParams.set("category","instrument_keys"); newsUrl.searchParams.set("instrument_keys",stockKeys.join(","));
   newsUrl.searchParams.set("page_number","1"); newsUrl.searchParams.set("page_size","100");
-  const quoteUrl=new URL("https://api.upstox.com/v3/market-quote/quotes");
-  quoteUrl.searchParams.set("instrument_key",batch.slice(0,500).join(","));
-  const [fii,dii,newsPayload,quotePayload]=await Promise.all([
-    fetchOptional(fiiUrl),fetchOptional(diiUrl),stockKeys.length?fetchOptional(newsUrl):Promise.resolve(null),fetchOptional(quoteUrl)
-  ]);
-  const quoteData=quotePayload?.data||{};
+  const [fii,dii,newsPayload]=await Promise.all([fetchOptional(fiiUrl),fetchOptional(diiUrl),stockKeys.length?fetchOptional(newsUrl):Promise.resolve(null)]);
+  const quoteData={}; const quoteKeys=[...new Set([...(marketUniverse.equityKeys||[]),...Object.keys(marketUniverse.sectorMap||{}),...batch])];
+  const quoteChunks=Array.from({length:Math.ceil(quoteKeys.length/500)},(_,i)=>quoteKeys.slice(i*500,(i+1)*500));
+  let successfulQuoteChunks=0;
+  for(const chunk of quoteChunks){const q=new URL("https://api.upstox.com/v3/market-quote/quotes");q.searchParams.set("instrument_key",chunk.join(","));const d=await fetchOptional(q);if(d?.data){Object.assign(quoteData,d.data);successfulQuoteChunks++;}}
   const institutional=summariseInstitutionalFlows(fii,dii);
   const news=normaliseVerifiedNews(newsPayload);
-  const breadth=analyseMarketBreadth(quoteData);
+  const breadth=analyseMarketBreadth(quoteData);\n  breadth.coverage={requestedEquities:(marketUniverse.equityKeys||[]).length,successfulQuoteChunks,totalQuoteChunks:quoteChunks.length,universe:"NSE cash equity instrument master"};\n  const sectorBreadth=analyseSectorBreadth(quoteData,marketUniverse.sectorMap||{});
   const structures={};
   for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]) {
     const candlesByTimeframe={};
@@ -88,6 +87,15 @@ async function discoverUniverse() {
   const keys = new Set(["NSE_INDEX|Nifty 50", "NSE_INDEX|Nifty Bank"]);
   for (const x of rows) if (x.segment === "NSE_FO" && ["CE", "PE"].includes(x.instrument_type) && ["EQUITY", "INDEX"].includes(x.underlying_type) && validKey(x.underlying_key)) keys.add(x.underlying_key);
   return [...keys];
+}
+async function discoverMarketUniverse() {
+  const r=await fetch("https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz");
+  if(!r.ok) throw new Error("Could not download NSE instrument master for breadth: "+r.status);
+  const rows=JSON.parse(gunzipSync(Buffer.from(await r.arrayBuffer())).toString("utf8"));
+  const equityKeys=[...new Set(rows.filter(x=>x.segment==="NSE_EQ"&&x.instrument_type==="EQ"&&x.instrument_key).map(x=>x.instrument_key))];
+  const sectorMap={};
+  for(const x of rows.filter(x=>x.segment==="NSE_INDEX"&&x.instrument_key)){const name=String(x.name||x.trading_symbol||"");if(!/Nifty (Auto|Bank|Financial Services|FMCG|IT|Media|Metal|Pharma|Private Bank|PSU Bank|Realty|Healthcare|Consumer Durables|Oil & Gas)/i.test(name))continue;sectorMap[x.instrument_key]=name.replace(/^Nifty\\s*/i,"");}
+  return {equityKeys,sectorMap};
 }
 async function scanUnderlying(key, rankOptionChain) {
   const cUrl = new URL("https://api.upstox.com/v2/option/contract"); cUrl.searchParams.set("instrument_key", key);
@@ -151,7 +159,7 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
-  const research = await collectResearch(batch, token, payload.autopilot.latestResearch);
+  const marketUniverse = await discoverMarketUniverse();\n  const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
   payload.autopilot.latestResearch = research;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   for (const underlyingKey of batch) {
