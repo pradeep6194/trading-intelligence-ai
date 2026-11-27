@@ -15,7 +15,7 @@ test("OHLCV structure reports available state and never labels wick-only breakou
   const rows=[];
   for(let i=0;i<35;i++){const close=100+i*.2;rows.push([new Date(Date.UTC(2026,0,1,0,i)).toISOString(),close-.1,close+.4,close-.4,close,100+i,0]);}
   const result=analyseOhlcvStructure(rows,{minimumCandles:20});
-  assert.equal(result.status,"available"); assert.ok(["bullish","bearish","range"].includes(result.bias)); assert.ok(Array.isArray(result.events));
+  assert.equal(result.status,"available"); assert.ok(["bullish","bearish","range"].includes(result.bias)); assert.ok(Array.isArray(result.events)); assert.ok(Array.isArray(result.orderBlocks)); assert.ok(Array.isArray(result.liquiditySweeps)); assert.ok(Array.isArray(result.fairValueGaps));
 });
 test("breadth computes advances, declines and unchanged from returned quotes only",()=>{
   const result=analyseMarketBreadth({"NSE_EQ|A":{net_change:2},"NSE_EQ|B":{net_change:-1},"NSE_EQ|C":{net_change:0}});
