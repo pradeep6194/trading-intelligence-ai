@@ -129,10 +129,18 @@ app.get("/api/candles", async (req, res) => {
   if(!allowed.has(instrumentKey)) return res.status(400).json({error:"Is build mein NIFTY, BANK NIFTY aur INDIA VIX supported hain."});
   if(!((unit==="minutes" && /^(1|2|3|5|10|15|30)$/.test(interval)) || (unit==="hours" && /^(1|2|3|4|5)$/.test(interval)) || (unit==="days" && interval==="1"))) return res.status(400).json({error:"Unsupported candle timeframe."});
   try {
-    const intraday=String(req.query.range||"today")==="today";
+    const range=String(req.query.range||"today");
+    const isoDate=v=>/^\\d{4}-\\d{2}-\\d{2}$/.test(String(v||"")) && !Number.isNaN(Date.parse(String(v)+"T00:00:00Z"));
+    const customFrom=String(req.query.from_date||"");
+    const customTo=String(req.query.to_date||"");
+    if(range==="custom" && (!isoDate(customFrom)||!isoDate(customTo)||customFrom>customTo)) return res.status(400).json({error:"Valid from_date aur to_date (YYYY-MM-DD) select karein."});
+    if(range==="custom" && (Date.parse(customTo)-Date.parse(customFrom)>366*86400000)) return res.status(400).json({error:"Backtest date range maximum 366 days hai."});
+    const intraday=range==="today";
+    const toDate=range==="custom"?customTo:String(req.query.to_date||new Date().toISOString().slice(0,10));
+    const fromDate=range==="custom"?customFrom:String(req.query.from_date||new Date(Date.now()-7*86400000).toISOString().slice(0,10));
     const url=intraday
       ? new URL("https://api.upstox.com/v3/historical-candle/intraday/"+encodeURIComponent(instrumentKey)+"/"+unit+"/"+interval)
-      : new URL("https://api.upstox.com/v3/historical-candle/"+encodeURIComponent(instrumentKey)+"/"+unit+"/"+interval+"/"+String(req.query.to_date||new Date().toISOString().slice(0,10))+"/"+String(req.query.from_date||new Date(Date.now()-7*86400000).toISOString().slice(0,10)));
+      : new URL("https://api.upstox.com/v3/historical-candle/"+encodeURIComponent(instrumentKey)+"/"+unit+"/"+interval+"/"+toDate+"/"+fromDate);
     const response=await fetch(url,{headers:{accept:"application/json",Authorization:"Bearer "+accessToken}});
     const data=await response.json();res.status(response.status).json(data);
   } catch(e){res.status(502).json({error:e.message});}
