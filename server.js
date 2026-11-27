@@ -206,7 +206,8 @@ app.get("/api/options/scan", async (req, res) => {
 app.get("/api/options/paper/status", (_req, res) => res.json(optionsPaperStatus()));
 app.post("/api/options/paper/enter", async (req, res) => {
   try {
-    const scan = await getRankedOptionScan(String(req.body?.underlyingKey || ""), String(req.body?.expiry || ""));
+    const filters = req.body?.filters || {};
+    const scan = await getRankedOptionScan(String(req.body?.underlyingKey || ""), String(req.body?.expiry || ""), filters);
     const candidate = scan.candidates.find(c => c.instrumentKey === req.body?.instrumentKey);
     if (!candidate) return res.status(409).json({ error: "Selected contract is no longer in the fresh scan. Scan again." });
     res.json(openOptionsPaper(candidate));
