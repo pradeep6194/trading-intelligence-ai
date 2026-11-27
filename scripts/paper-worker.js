@@ -88,6 +88,7 @@ try {
   const batch = Array.from({ length: Math.min(batchSize, universe.length) }, (_, i) => universe[(start + i) % universe.length]);
   payload.autopilot.scanCursor = (start + batch.length) % universe.length;
   payload.autopilot.universeCount = universe.length;
+  fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
   for (const underlyingKey of batch) {
     try {
