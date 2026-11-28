@@ -19,7 +19,7 @@
   $("#apLearned").textContent=learned;
   const decision=d.adaptiveDecision||{};
   $("#apStrategy").textContent=decision.selectedStrategy?decision.selectedStrategy+" · "+(decision.selectedRegime||"regime unknown"):"No eligible candidate selected";
-  $("#apReason").textContent=decision.reason||"The worker has not published an adaptive decision yet. A scan can legitimately select no trade when filters or risk gates fail.";
+  $("#apReason").textContent=(decision.reason||"The worker has not published an adaptive decision yet. A scan can legitimately select no trade when filters or risk gates fail.")+" App trade journal: "+(d.appLearning?.journalTrades??0)+" records; historical studies: "+(d.lastWorkerResult?.learningCoverage?.eligibleHistoricalStudies??0)+" eligible. Historical prior is capped and separate from realised paper outcomes.";
   const rows=d.recentTrades||[];
   $("#apTradeList").innerHTML=rows.length?rows.slice(0,8).map(t=>'<div class="ap-trade-row"><b>'+esc(t.symbol||t.underlyingKey||"Option trade")+'</b><span>'+esc(t.status||"—")+'</span><span>'+money(t.pnl)+'</span><small>'+esc(t.strategyId||"Strategy not tagged")+' · '+esc(t.marketRegime||"Regime unavailable")+' · '+time(t.openedAt)+'</small></div>').join(""):'<div class="history-empty">No autopilot trades recorded yet. The worker may wait for a valid setup.</div>';
   $("#apError").textContent=d.lastError?"Worker error: "+d.lastError:"";
