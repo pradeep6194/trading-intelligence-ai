@@ -1,0 +1,6 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { analyseOneMinuteMarket } from "./one-minute-learning.js";
+function sample(){const rows=[];let p=22000;const start=Date.parse("2025-01-02T03:45:00Z");for(let d=0;d<8;d++){for(let m=0;m<375;m++){const ts=start+d*86400000+m*60000;p+=m<190?1.4:-0.8;rows.push([new Date(ts).toISOString(),p-0.4,p+0.7,p-0.8,p,100,0]);}}return rows;}
+test("one-minute engine returns chronological split, strategy metrics and trade fills",()=>{const r=analyseOneMinuteMarket(sample());assert.equal(r.status,"available");assert.equal(r.timeframe,"1m");assert.equal(r.strategies.ema_9_21.name,"9/21 EMA intraday trend");assert.ok(r.strategies.ema_9_21.train);assert.ok(r.strategies.opening_range_breakout.outOfSample);assert.ok(r.strategies.rsi_reversion.trades);assert.ok(r.limitations.some(x=>x.includes("not NIFTY/BANKNIFTY futures or options")));for(const s of Object.values(r.strategies)){for(const t of s.trades){assert.ok(Number.isFinite(t.entryPrice));assert.ok(Number.isFinite(t.exitPrice));assert.ok(Number.isFinite(t.netPct));assert.ok(t.holdingMinutes>=1);}}});
+test("one-minute engine rejects too little data",()=>{assert.equal(analyseOneMinuteMarket(sample().slice(0,100)).status,"insufficient_history");});
