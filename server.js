@@ -374,7 +374,7 @@ app.post("/api/learning/sync", async (req, res) => {
     const existing = Array.isArray(db.payload.appTradeJournal) ? db.payload.appTradeJournal : [];
     const optionsTrades = optionsPaperStatus().history || [];
     const technicalTrades = paperStatus().history || [];
-    const browserTrades = Array.isArray(req.body?.trades) ? req.body.trades.slice(-500) : [];
+    const browserTrades = Array.isArray(req.body?.trades) ? req.body.trades.slice(-500).map(t => ({...t, source:"manual_practice", status:"planned", pnl:null, strategyId:t.strategyId||"unclassified"})) : [];
     const incoming = [
       ...optionsTrades.map(t => ({...t, source:t.source||"manual_options"})),
       ...technicalTrades.map(t => ({...t, source:t.source||"technical_lab"})),
