@@ -162,7 +162,8 @@ const { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper }
 const { recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotError, hasEnteredUnderlyingToday, markUnderlyingEnteredToday } = await import("../trading/autopilot.js");
 const { classifyMarketEvidence, resolveForwardOutcome } = await import("../trading/market-learning.js");
 const { evaluateIntelligenceSuite } = await import("../trading/intelligence-suite.js");
-const { learnFromClosedTrades, selectAdaptiveCandidate } = await import("../trading/adaptive-strategy.js");\nconst { buildUnifiedLearningInput } = await import("../trading/unified-learning.js");
+const { learnFromClosedTrades, selectAdaptiveCandidate } = await import("../trading/adaptive-strategy.js");
+const { buildUnifiedLearningInput } = await import("../trading/unified-learning.js");
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
@@ -177,7 +178,10 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
-  const unifiedLearning = buildUnifiedLearningInput(payload);\n  payload.autopilot.adaptivePolicy ||= {};\n  payload.autopilot.adaptivePolicy.historicalEvidence = unifiedLearning.historical;\n  payload.autopilot.adaptivePolicy = learnFromClosedTrades(payload.autopilot.adaptivePolicy, unifiedLearning.trades);
+  const unifiedLearning = buildUnifiedLearningInput(payload);
+  payload.autopilot.adaptivePolicy ||= {};
+  payload.autopilot.adaptivePolicy.historicalEvidence = unifiedLearning.historical;
+  payload.autopilot.adaptivePolicy = learnFromClosedTrades(payload.autopilot.adaptivePolicy, unifiedLearning.trades);
   const marketUniverse = await discoverMarketUniverse();
   const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
   payload.autopilot.latestResearch = research;
