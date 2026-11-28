@@ -1,6 +1,7 @@
 import { analyseHistoricalMarket, buildNightLearningReport } from "../trading/night-learning.js";
 import { buildBookLearningPlan } from "../trading/book-learning.js";
-import { analyseAdvancedHistoricalMarket, compareStrategyResults } from "../trading/advanced-historical-learning.js";\nimport { analyseOptionGreekSnapshots } from "../trading/options-learning.js";
+import { analyseAdvancedHistoricalMarket, compareStrategyResults } from "../trading/advanced-historical-learning.js";
+import { analyseOptionGreekSnapshots } from "../trading/options-learning.js";
 
 const token=process.env.UPSTOX_ANALYTICS_TOKEN;
 const supabaseUrl=(process.env.SUPABASE_URL||"").replace(/\/$/,"");
