@@ -65,7 +65,7 @@ async function fetchOptionSnapshots(days=30) {
 const payload=await read();payload.autopilot||={};const markets={};
 const previousMinuteStudies=payload.autopilot.nightLearning?.minuteStudies||{};
 const lastMinuteRun=Number(payload.autopilot.nightLearningMinuteRun||0);
-const minuteRefreshDue=!lastMinuteRun||Date.now()-lastMinuteRun>=24*60*60*1000;
+const discoveryMissing=Object.values(previousMinuteStudies).some(study=>study?.status==="available"&&!study?.discovery);\nconst minuteRefreshDue=!lastMinuteRun||discoveryMissing||Date.now()-lastMinuteRun>=24*60*60*1000;
 const minuteStudies=minuteRefreshDue?{}:previousMinuteStudies;
 const dataCoverage={daily:{},minute:{refreshed:minuteRefreshDue,markets:{}}};
 for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]){
