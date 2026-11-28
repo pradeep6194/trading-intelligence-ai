@@ -18,7 +18,7 @@ test("analyses 30-day changes, Greeks and correlations without fabricated observ
   assert.equal(result.snapshots, 12);
   assert.equal(result.contracts.length, 1);
   assert.equal(result.contracts[0].iv.changePoints, 5.5);
-  assert.equal(result.contracts[0].premium.changePct, 55);
+  assert.ok(Math.abs(result.contracts[0].premium.changePct - 55) < 1e-9);
   assert.equal(result.contracts[0].latestGreeks.delta, 0.61);
   assert.equal(result.correlations.ivChangePremiumChange.status, "available");
   assert.equal(result.correlations.spotChangePremiumChange.status, "available");
