@@ -22,3 +22,24 @@
 .learn-feed-news{margin-top:14px}.learn-feed-news h4{margin:12px 0}.learn-feed-news .learn-event{margin:10px 0;padding:12px;border:1px solid var(--line,#263246);border-radius:12px}.learn-feed-news a{color:var(--gold,#d6b46a);font-size:13px}.learn-feed-news small{display:block;color:var(--muted,#9aa7b8);font-size:11px}
 
 .learn-research-detail{margin-top:12px;padding:12px;border:1px solid var(--line,#263246);border-radius:12px}.learn-research-detail p{margin:7px 0;font-size:13px}.learn-research-detail small{color:var(--muted,#9aa7b8);font-size:11px}
+
+.book-auto-panel{margin:18px 0;padding:18px}
+.book-auto-panel>p{line-height:1.6}
+.book-auto-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.book-auto-stats>div{min-width:0;padding:12px;border:1px solid var(--line,#29364b);border-radius:12px;background:rgba(255,255,255,.025)}
+.book-auto-stats small,.book-auto-stats b{display:block}
+.book-auto-stats small{font-size:11px;color:var(--muted);margin-bottom:6px}
+.book-auto-stats b{font-size:13px;overflow-wrap:anywhere}
+.book-auto-principles{padding:13px;border:1px solid var(--line,#29364b);border-radius:12px;line-height:1.6;font-size:13px}
+.book-auto-principles ul,.book-auto-principles ol{padding-left:20px}
+.book-auto-principles li{margin:7px 0}
+.book-auto-principles li small{display:block;color:var(--muted);font-size:11px}
+.ahl-benchmark{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0;padding:12px;border:1px solid var(--line,#29364b);border-radius:10px;font-size:12px}
+.ahl-benchmark b{width:100%}
+.ahl-benchmark span{padding:5px 8px;border-radius:7px;background:rgba(255,255,255,.05)}
+.ahl-trade-log{margin-top:12px;border-top:1px solid var(--line,#29364b);padding-top:10px}
+.ahl-trade-log summary{cursor:pointer;color:var(--gold,#d6b46a);font-size:12px}
+.ahl-trade-scroll{overflow-x:auto;margin-top:8px}
+.ahl-trade-scroll table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+.ahl-trade-scroll th,.ahl-trade-scroll td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line,#29364b)}
+@media(max-width:650px){.book-auto-stats{grid-template-columns:1fr 1fr}.ahl-metric-grid{grid-template-columns:1fr 1fr}}
