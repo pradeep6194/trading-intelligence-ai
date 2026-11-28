@@ -8,10 +8,10 @@ export function collectAttributableTrades(payload={}){
   ...((payload.appTradeJournal)||[]).map(t=>({...t,source:t.source||"app_paper"}))
  ];
  const seen=new Map();
- for(const t of groups){if(!closedStatus(t))continue;const key=String(t.sourceTradeId||t.id);const prior=seen.get(key);
+ for(const t of groups){if(!closedStatus(t))continue;const key=String(t.sourceTradeId||t.id).split(":").at(-1);const prior=seen.get(key);
   if(!prior||(!prior.strategyId&&t.strategyId))seen.set(key,{...t,source:sourceOf(t),sourceTradeId:key});
  }
- return [...seen.values()].map(t=>({...t,id:String(t.sourceTradeId||t.id),strategyId:t.strategyId||inferStrategy(t),marketRegime:t.marketRegime||t.regime||"mixed",timeframe:t.timeframe||"unknown",market:t.market||t.underlyingKey||t.symbol||"unknown",attribution:{source:sourceOf(t),timeframe:t.timeframe||"unknown",market:t.market||t.underlyingKey||"unknown",strategyId:t.strategyId||inferStrategy(t),entryReason:t.entryReason||t.reasons?.join("; ")||null,exitReason:t.outcomeReason||t.exitReason||null}}));
+ return [...seen.values()].map(t=>({...t,id:String(t.id).split(":").at(-1),strategyId:t.strategyId||inferStrategy(t),marketRegime:t.marketRegime||t.regime||"mixed",timeframe:t.timeframe||"unknown",market:t.market||t.underlyingKey||t.symbol||"unknown",attribution:{source:sourceOf(t),timeframe:t.timeframe||"unknown",market:t.market||t.underlyingKey||"unknown",strategyId:t.strategyId||inferStrategy(t),entryReason:t.entryReason||t.reasons?.join("; ")||null,exitReason:t.outcomeReason||t.exitReason||null}}));
 }
 function inferStrategy(t){return t.strategyId||t.strategy||t.analysis?.strategyId||"unclassified";}
 export function buildHistoricalEvidence(nightLearning={}){
