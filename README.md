@@ -63,3 +63,12 @@ Open `http://localhost:3000`.
 - Optional environment variables: `PAPER_AUTOPILOT_ENABLED=false` to prevent automatic startup; `PAPER_SCAN_INTERVAL_MS=300000` (minimum 60000); `PAPER_SCAN_BATCH_SIZE=20`; `PAPER_SCAN_UNDERLYINGS` as a comma-separated override list of Upstox underlying instrument keys.
 - The 90-day clock begins on first activation. The default scan is a curated shortlist, not every NSE F&O stock; NSE holidays are not independently calendar-filtered. Check data freshness and Upstox API limits before widening the list.
 - The paper engine uses simulated entries at ask and marks/exits at bid. Real-world slippage, exchange charges and taxes can differ. The experiment is research, not financial advice or a promise of profit.
+
+
+## Live option Greeks archive
+
+The scheduled paper worker archives each available NIFTY 50 and BANK NIFTY option-chain snapshot during NSE market hours. It stores CE/PE contract identity, expiry, strike, underlying spot, LTP, bid/ask, volume, OI, IV, Delta, Gamma, Theta and Vega in Supabase. Snapshot rows are timestamped and upserted idempotently.
+
+**One-time setup required:** open the Supabase project SQL Editor and run [the option Greeks archive migration](supabase/migrations/20261128_option_greek_snapshots.sql). The GitHub Actions worker uses the existing `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets. If the migration has not been applied, the worker logs a warning and continues the paper scan without interrupting it.
+
+This archive starts collecting observations from deployment onward; it does not manufacture old Greeks. Upstox historical candle data can provide option OHLCV/OI where the account and instrument are eligible, but historical Greeks must be sourced from a genuine archived provider snapshot. The current archive records market observations; it does not yet claim a validated predictive relationship between Greeks and future premium movement.
