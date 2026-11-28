@@ -9,7 +9,7 @@ test("new course starts at chapter one and exposes a lesson and quiz",()=>{
 test("passing assessment marks learned but not completed until task evidence",()=>{
  const result=submitBookAssessment({},[0,1]);
  assert.equal(result.passed,true);assert.equal(result.state.chapters[1].status,"learned");
- assert.throws(()=>submitBookTaskEvidence(result.state,"I completed the task with written evidence."),/assessment/);
+ assert.throws(()=>submitBookTaskEvidence(result.state,"too short"),/20 characters/);
  const done=submitBookTaskEvidence(result.state,"I documented the lifecycle from historical data validation to risk controls and monitoring.");
  assert.equal(done.state.chapters[1].status,"completed");assert.equal(done.nextChapter,2);
 });
