@@ -162,6 +162,7 @@ const { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper }
 const { recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotError, hasEnteredUnderlyingToday, markUnderlyingEnteredToday } = await import("../trading/autopilot.js");
 const { classifyMarketEvidence, resolveForwardOutcome } = await import("../trading/market-learning.js");
 const { evaluateIntelligenceSuite } = await import("../trading/intelligence-suite.js");
+const { learnFromClosedTrades, selectAdaptiveCandidate } = await import("../trading/adaptive-strategy.js");
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
@@ -176,6 +177,7 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
+  payload.autopilot.adaptivePolicy = learnFromClosedTrades(payload.autopilot.adaptivePolicy || {}, payload.autopilot.trades || []);
   const marketUniverse = await discoverMarketUniverse();
   const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
   payload.autopilot.latestResearch = research;
@@ -230,13 +232,14 @@ try {
       afterScan.autopilot.marketSnapshots ||= {};
       afterScan.autopilot.marketSnapshots[underlyingKey] = { at: observation.at, spot: result.spot, pcr: result.pcr, callOi: result.callOi, putOi: result.putOi };
       fs.writeFileSync(dataFile, JSON.stringify(afterScan), { mode: 0o600 });
-      if (top) best.push({ ...top, intelligence });
+      if (top) best.push({ ...top, intelligence, analysis });
     } catch (error) {
       recordScan({ at: Date.now(), underlyingKey, error: error.message, candidateCount: 0 });
     }
   }
-  best.sort((a,b) => b.volatilityScore - a.volatilityScore);
-  const candidate = best.find(x => x.volatilityScore >= 70 && x.changePct >= 3 && x.spreadPct <= 3.5 && x.volume >= 1000 && x.oi >= 10000 && !hasEnteredUnderlyingToday(x.underlyingKey, day));
+  const adaptive = selectAdaptiveCandidate(best, payload.autopilot.adaptivePolicy, { spotChangePct: best[0]?.analysis?.drivers?.find(d => d.factor === "spot momentum") ? Number(best[0].analysis.drivers.find(d => d.factor === "spot momentum").observation.match(/[-+]?\\d+(?:\\.\\d+)?/)?.[0]) : 0 });
+  const candidate = adaptive.ranked.find(x => !hasEnteredUnderlyingToday(x.underlyingKey, day)) || null;
+  payload.autopilot.adaptiveDecision = { at: Date.now(), policyVersion: adaptive.policyVersion, selectedStrategy: candidate?.strategyId || null, selectedRegime: candidate?.regime || null, ranked: adaptive.ranked.slice(0,5).map(x => ({symbol:x.symbol,strategyId:x.strategyId,regime:x.regime,baseScore:x.volatilityScore,adaptiveScore:x.adaptiveScore,experience:x.experience})), reason: adaptive.reason };
   if (candidate) {
     const opened = openOptionsPaper(candidate);
     if (opened.opened) {
@@ -247,7 +250,8 @@ try {
         entry: opened.position.entry, quantity: opened.position.quantity, lots: opened.position.lots,
         stop: opened.position.stop, target: opened.position.target, score: candidate.volatilityScore,
         changePct: candidate.changePct, iv: candidate.iv, volume: candidate.volume, oi: candidate.oi, spreadPct: candidate.spreadPct,
-        reasons: ["Relative volatility score >= 70", "Option premium day change >= +3%", "Volume and OI filters passed", "Bid-ask spread <= 3.5%", "One entry per underlying per Indian market day", "Integrated research snapshot attached; unavailable feeds are explicitly excluded"],
+        strategyId: candidate.strategyId, strategyVersion: 1, marketRegime: candidate.regime, strategyFeatures: candidate.features, experienceAtEntry: candidate.experience, adaptiveScore: candidate.adaptiveScore,
+        reasons: ["Adaptive strategy: " + candidate.strategyId, "Market regime: " + candidate.regime, "Base scanner and liquidity gates passed", "Experience adjustment is sample-shrunk; risk controls remain unchanged", "One entry per underlying per Indian market day"],
         intelligence: candidate.intelligence || null
       });
     }
@@ -271,7 +275,7 @@ try {
   payload = JSON.parse(fs.readFileSync(dataFile, "utf8"));
   payload.autopilot.lastError = null;
   payload.autopilot.lastWorkerAt = Date.now();
-  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate), researchFeeds: research.feedStatus };
+  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate), adaptiveStrategy: candidate?.strategyId || null, adaptiveRegime: candidate?.regime || null, learnedTrades: payload.autopilot.adaptivePolicy?.lastLearning?.totalLearned || 0, researchFeeds: research.feedStatus };
   await dbWrite(payload);
   console.log("Paper scan completed:", JSON.stringify(payload.autopilot.lastWorkerResult));
 } catch (error) {
