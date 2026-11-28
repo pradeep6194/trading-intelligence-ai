@@ -243,7 +243,7 @@ try {
   }
   const adaptive = selectAdaptiveCandidate(best, payload.autopilot.adaptivePolicy, { spotChangePct: best[0]?.analysis?.drivers?.find(d => d.factor === "spot momentum") ? Number(best[0].analysis.drivers.find(d => d.factor === "spot momentum").observation.match(/[-+]?\\d+(?:\\.\\d+)?/)?.[0]) : 0 });
   const candidate = adaptive.ranked.find(x => !hasEnteredUnderlyingToday(x.underlyingKey, day)) || null;
-  payload.autopilot.adaptiveDecision = { at: Date.now(), policyVersion: adaptive.policyVersion, selectedStrategy: candidate?.strategyId || null, selectedRegime: candidate?.regime || null, ranked: adaptive.ranked.slice(0,5).map(x => ({symbol:x.symbol,strategyId:x.strategyId,regime:x.regime,baseScore:x.volatilityScore,adaptiveScore:x.adaptiveScore,experience:x.experience})), reason: adaptive.reason };
+  payload.autopilot.adaptiveDecision = { at: Date.now(), policyVersion: adaptive.policyVersion, selectedStrategy: candidate?.strategyId || null, selectedRegime: candidate?.regime || null, ranked: adaptive.ranked.slice(0,5).map(x => ({symbol:x.symbol,strategyId:x.strategyId,regime:x.regime,baseScore:x.volatilityScore,adaptiveScore:x.adaptiveScore,historicalAdjustment:x.historicalAdjustment,experience:x.experience})), reason: adaptive.reason + " Historical 1m/1D index-proxy evidence is a capped prior; closed app paper trades drive realised-outcome learning." };
   if (candidate) {
     const opened = openOptionsPaper(candidate);
     if (opened.opened) {
