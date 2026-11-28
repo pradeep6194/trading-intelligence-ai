@@ -1,6 +1,16 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const money=n=>"₹"+Number(n||0).toLocaleString("en-IN",{maximumFractionDigits:2});
-let state=JSON.parse(localStorage.getItem("tia-state")||'{"cash":50000,"realised":0,"trades":[]}');
+const DEFAULT_STATE={cash:50000,realised:0,trades:[]};
+function loadState(){
+ try{
+  const raw=localStorage.getItem("tia-state");
+  if(!raw)return {...DEFAULT_STATE};
+  const parsed=JSON.parse(raw);
+  if(!parsed||typeof parsed!=="object"||!Array.isArray(parsed.trades))return {...DEFAULT_STATE};
+  return {cash:Number.isFinite(Number(parsed.cash))?Number(parsed.cash):50000,realised:Number.isFinite(Number(parsed.realised))?Number(parsed.realised):0,trades:parsed.trades.filter(t=>t&&typeof t==="object")};
+ }catch(error){console.warn("Saved paper state could not be read; using a safe empty state.",error);return {...DEFAULT_STATE};}
+}
+let state=loadState();
 function save(){localStorage.setItem("tia-state",JSON.stringify(state));renderAccount()}
 function renderAccount(){const cash=state.cash??50000;$("#cash").textContent=money(cash);$("#positions").textContent="0";$("#pnl").textContent=money(state.realised);$("#paperCash").textContent=money(cash);$("#paperEquity").innerHTML=money(cash+state.realised)+'<span>Virtual equity (realised P&L only)</span>';$("#tradeCount").textContent=state.trades.length;renderTrades()}
 function renderTrades(){const rows=state.trades.slice().reverse();const html=rows.map(t=>`<div class="trade-row"><span>${esc(t.symbol)} · ${t.date}</span><span>${t.side}</span><span>${t.qty} × ${money(t.entry)}</span><span>Risk ${money(t.risk)}</span></div>`).join("");$("#tradeHistory").innerHTML=rows.length?'<div class="trade-row head"><span>INSTRUMENT</span><span>SIDE</span><span>SIZE</span><span>PLANNED RISK</span></div>'+html:'<div class="history-empty">No practice trades yet. Record your first simulated trade.</div>';$("#journalList").innerHTML=rows.length?html:'<div class="history-empty">Your recorded paper trades will appear here.</div>'}
@@ -25,15 +35,8 @@ const lessons={
 "options":"Options Greeks premium की sensitivity समझाते हैं, भविष्य की गारंटी नहीं देते। Delta बताता है कि underlying में छोटे बदलाव पर option premium कितना बदल सकता है। Gamma, Delta के बदलाव की दर है। Theta समय बीतने से premium पर असर बताता है। Vega implied volatility बदलने पर premium की sensitivity बताता है। Short options में expiry, gap और तेज volatility के दौरान बड़ा नुकसान हो सकता है। किसी भी trade से पहले defined-risk strategy और maximum loss समझें।",
 "position":"Cash instrument के लिए प्रति unit planned risk = entry और stop-loss का absolute अंतर। Risk budget = capital × risk percentage। Quantity = floor(risk budget ÷ प्रति unit risk)। उदाहरण: ₹50,000 capital का 0.5% = ₹250 risk budget। Entry ₹250 और stop ₹245 हो तो प्रति share risk ₹5 है; गणित के अनुसार quantity 50 shares होगी, charges और slippage से पहले। Futures और options में lot size, margin, gap risk और contract multiplier भी जाँचना ज़रूरी है।"
 };
-function coachAnswer(q){const s=q.toLowerCase();let key=s.includes("liquid")||s.includes("sweep")?"liquidity":s.includes("option")||s.includes("greek")||s.includes("theta")||s.includes("vega")?"options":s.includes("risk")||s.includes("size")||s.includes("quantity")||s.includes("stop")?"position":"market structure";const live=Object.values(latestMarket).map(t=>t.key+": "+Number(t.ltp).toLocaleString("en-IN")).join(" | ");const context=live?"
-
-Live feed se latest tick: "+live+".":"
-
-Abhi live tick available nahi hai; main market direction ka daava nahi karunga.";return lessons[key]+context+"
-
-Hindi mein yaad rakhein: context → confirmation → invalidation → risk. Yeh shiksha hai, buy/sell call nahi.";}
-function addBubble(who,text){const div=document.createElement("div");div.className="bubble "+(who==="Coach"?"coach":"");div.innerHTML=`<b>${who}</b><p>${esc(text).replace(/
-/g,"<br>")}</p>`;$("#chat").appendChild(div);$("#chat").scrollTop=$("#chat").scrollHeight}
+function coachAnswer(q){const s=q.toLowerCase();let key=s.includes("liquid")||s.includes("sweep")?"liquidity":s.includes("option")||s.includes("greek")||s.includes("theta")||s.includes("vega")?"options":s.includes("risk")||s.includes("size")||s.includes("quantity")||s.includes("stop")?"position":"market structure";const live=Object.values(latestMarket).map(t=>t.key+": "+Number(t.ltp).toLocaleString("en-IN")).join(" | ");const context=live?("\\n\\nLive feed se latest tick: "+live+"."):("\\n\\nAbhi live tick available nahi hai; main market direction ka daava nahi karunga.");return lessons[key]+context+"\\n\\nHindi mein yaad rakhein: context → confirmation → invalidation → risk. Yeh shiksha hai, buy/sell call nahi.";}
+function addBubble(who,text){const div=document.createElement("div");div.className="bubble "+(who==="Coach"?"coach":"");div.innerHTML=`<b>${who}</b><p>${esc(text).replace(/\\n/g,"<br>")}</p>`;$("#chat").appendChild(div);$("#chat").scrollTop=$("#chat").scrollHeight}
 function ask(q){if(!q.trim())return;addBubble("You",q);addBubble("Coach",coachAnswer(q));}
 $("#askForm").onsubmit=e=>{e.preventDefault();const q=$("#question").value;$("#question").value="";ask(q)};
 $$("[data-prompt]").forEach(b=>b.onclick=()=>ask(b.dataset.prompt));
