@@ -16,7 +16,7 @@ test("analyses 30-day changes, Greeks and correlations without fabricated observ
   const result = analyseOptionGreekSnapshots(rows, { windowDays: 30, now });
   assert.equal(result.status, "available");
   assert.equal(result.snapshots, 12);
-  assert.equal(result.contracts, 1);
+  assert.equal(result.contracts.length, 1);
   assert.equal(result.contracts[0].iv.changePoints, 5.5);
   assert.equal(result.contracts[0].premium.changePct, 55);
   assert.equal(result.contracts[0].latestGreeks.delta, 0.61);
