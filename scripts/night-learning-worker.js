@@ -2,6 +2,7 @@ import { analyseHistoricalMarket, buildNightLearningReport } from "../trading/ni
 import { buildBookLearningPlan } from "../trading/book-learning.js";
 import { analyseAdvancedHistoricalMarket, compareStrategyResults } from "../trading/advanced-historical-learning.js";
 import { analyseOptionGreekSnapshots } from "../trading/options-learning.js";
+import { discoverMinuteStrategies } from "../trading/strategy-discovery.js";
 
 const token=process.env.UPSTOX_ANALYTICS_TOKEN;
 const supabaseUrl=(process.env.SUPABASE_URL||"").replace(/\/$/,"");
@@ -81,6 +82,7 @@ for(const key of ["NSE_INDEX|Nifty 50","NSE_INDEX|Nifty Bank"]){
   try{
    const minute=await fetchOneMinuteHistory(key),{analyseOneMinuteMarket}=await import("../trading/one-minute-learning.js");
    minuteStudies[key]=analyseOneMinuteMarket(minute.rows);
+   minuteStudies[key].discovery=discoverMinuteStrategies(minute.rows);
    minuteStudies[key].download={provider:"Upstox V3",unit:"minutes",interval:1,requestedFrom:minute.requestedFrom,requestedTo:minute.requestedTo,actualFrom:minute.from,actualTo:minute.to,requests:minute.requests,downloadedCandles:minute.rows.length};
    dataCoverage.minute.markets[key]={status:"available",requests:minute.requests,downloadedCandles:minute.rows.length,from:minute.from,to:minute.to};
   }catch(e){minuteStudies[key]={status:"unavailable",timeframe:"1m",error:String(e.message).slice(0,240),limitations:["No verified one-minute history returned; no synthetic values used."]};dataCoverage.minute.markets[key]={status:"unavailable",error:String(e.message).slice(0,240)};}
@@ -97,4 +99,4 @@ try{
 payload.autopilot.nightLearning=report;
 if(minuteRefreshDue&&Object.values(dataCoverage.minute.markets).every(v=>v.status==="available"))payload.autopilot.nightLearningMinuteRun=Date.now();
 payload.autopilot.nightLearningLastRun=Date.now();await write(payload);
-console.log("Night Learning report saved:",JSON.stringify({status:report.status,dataCoverage,markets:Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,{status:v.status,candles:v.candleCount,backtests:v.backtests?.length||0,advancedStrategies:Object.keys(v.advanced?.strategies||{}).length,rankedStrategies:v.advanced?.comparison?.ranked?.length||0,comparisonStatus:v.advanced?.comparison?.status||"unavailable"}])),minuteStudies:Object.fromEntries(Object.entries(minuteStudies).map(([k,v])=>[k,{status:v.status,candles:v.candleCount,requests:v.download?.requests,strategies:Object.keys(v.strategies||{}).length}])),optionsLearning:{status:report.optionsLearning.status,snapshots:report.optionsLearning.snapshots,contracts:report.optionsLearning.contracts,correlations:report.optionsLearning.correlations}}));
+console.log("Night Learning report saved:",JSON.stringify({status:report.status,dataCoverage,markets:Object.fromEntries(Object.entries(markets).map(([k,v])=>[k,{status:v.status,candles:v.candleCount,backtests:v.backtests?.length||0,advancedStrategies:Object.keys(v.advanced?.strategies||{}).length,rankedStrategies:v.advanced?.comparison?.ranked?.length||0,comparisonStatus:v.advanced?.comparison?.status||"unavailable"}])),minuteStudies:Object.fromEntries(Object.entries(minuteStudies).map(([k,v])=>[k,{status:v.status,candles:v.candleCount,requests:v.download?.requests,strategies:Object.keys(v.strategies||{}).length,discovered:Object.keys(v.discovery?.strategies||{}).length}])),optionsLearning:{status:report.optionsLearning.status,snapshots:report.optionsLearning.snapshots,contracts:report.optionsLearning.contracts,correlations:report.optionsLearning.correlations}}));
