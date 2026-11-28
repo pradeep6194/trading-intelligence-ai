@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1220"><meta name="description" content="Trading Intelligence AI — learn markets, practice with paper trading, and manage risk.">
 <title>Trading Intelligence AI</title><link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/book-learning.css"><link rel="stylesheet" href="/trading-engine.css"><link rel="stylesheet" href="/options-paper.css"><link rel="stylesheet" href="/learning.css">
+<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/trading-engine.css"><link rel="stylesheet" href="/options-paper.css"><link rel="stylesheet" href="/learning.css">
 </head>
 <body>
 <div class="app-shell">
@@ -153,17 +153,17 @@
 <section class="page" id="journal"><div class="section-head"><div><div class="eyebrow">PROCESS REVIEW</div><h3>Trade journal</h3><p class="muted">Review your decisions and planned risk. Your entries stay in this browser.</p></div></div><article class="panel"><div id="journalList" class="history-empty">Your recorded paper trades will appear here.</div></article></section>
 <section class="page" id="learning">
   <div class="section-head"><div><div class="eyebrow gold">CONTINUOUS MARKET STUDY</div><h3>Live Market Learning</h3><p class="muted">A rolling research log of NSE index and F&amp;O stock option-chain behaviour, market evidence and paper-trade outcomes.</p></div><button class="btn btn-outline" id="learnRefresh">Refresh</button></div>
-  <article class="book-learning">
-    <div class="eyebrow gold">BOOK-BASED AI TRAINING · 16 CHAPTERS</div>
-    <h3 id="bookCourseTitle">Successful Algorithmic Trading</h3>
-    <p class="book-muted">Chapter-by-chapter study, assessment and practical mastery. Progress is saved to your experiment database.</p>
-    <div id="bookProgress">Loading course progress…</div><div class="book-progress"><span id="bookProgressBar"></span></div>
-    <div class="book-actions"><select id="bookChapterSelect"><option value="1">Chapter 1</option><option value="2">Chapter 2</option><option value="3">Chapter 3</option><option value="4">Chapter 4</option><option value="5">Chapter 5</option><option value="6">Chapter 6</option><option value="7">Chapter 7</option><option value="8">Chapter 8</option><option value="9">Chapter 9</option><option value="10">Chapter 10</option><option value="11">Chapter 11</option><option value="12">Chapter 12</option><option value="13">Chapter 13</option><option value="14">Chapter 14</option><option value="15">Chapter 15</option><option value="16">Chapter 16</option></select><button id="bookLoadChapter" type="button">Open chapter</button><button id="bookRetry" type="button">Refresh</button></div>
-    <p class="eyebrow" id="bookPart"></p><h3 id="bookChapterTitle">Loading chapter…</h3>
-    <p id="bookObjective"></p><div id="bookConcepts"></div><ul id="bookNotes"></ul>
-    <form id="bookQuizForm"><h4>Knowledge check · pass mark 80%</h4><div id="bookQuiz"></div><div class="book-actions"><button type="submit">Submit assessment</button></div></form>
-    <form id="bookTaskForm" hidden><div class="book-task-box"><b>Practical implementation task</b><p id="bookTask"></p><label for="bookEvidence">Describe what you implemented or verified (minimum 20 characters)</label><textarea id="bookEvidence" placeholder="Record your method, test result, evidence and limitations…"></textarea><div class="book-actions"><button type="submit">Complete chapter & unlock next</button></div></div></form>
-    <p id="bookTaskStatus" class="book-muted"></p><p id="bookResult" class="book-result" aria-live="polite"></p>
+  <article class="panel book-auto-panel" id="bookAutoStudy">
+    <div class="panel-head"><div><div class="eyebrow gold">AUTONOMOUS BOOK-TO-BACKTEST ENGINE</div><h3>AI Study &amp; NIFTY Historical Paper Simulation</h3></div><span class="tag">PAPER ONLY</span></div>
+    <p class="muted">The system applies the research workflow from <b>Successful Algorithmic Trading</b> by Michael L. Halls-Moore. It studies historical NIFTY data, runs fixed-rule strategy simulations, and reports evidence. No chapter quiz or manual task is required.</p>
+    <div class="book-auto-stats">
+      <div><small>Book framework</small><b id="bookAutoSource">16 chapters mapped</b></div>
+      <div><small>Historical coverage</small><b id="bookAutoCoverage">Waiting for research run</b></div>
+      <div><small>Research strategies</small><b id="bookAutoStrategies">3 baseline models</b></div>
+      <div><small>Last research cycle</small><b id="bookAutoLastRun">Waiting for worker</b></div>
+    </div>
+    <div class="book-auto-principles" id="bookAutoPrinciples">Book principles: avoid look-ahead and overfitting, include transaction-cost assumptions, use chronological train/validation/out-of-sample splits, and report drawdown alongside returns.</div>
+    <p class="muted tiny">Historical daily index simulation is a cash-index proxy, not a NIFTY options/futures backtest. It cannot establish future profitability. The final out-of-sample segment is kept separate from strategy selection.</p>
   </article>
   <div class="learning-hero">
     <article class="learning-stat"><small>Worker status</small><b id="learnState">Loading…</b><small id="learnLast">—</small></article>
@@ -179,5 +179,5 @@
 </section>
 <footer>TRADING INTELLIGENCE AI <span>Educational tool · Not investment advice · Paper mode by default</span></footer>
 </main></div>
-<script src="/app.js"></script><script src="/backtest-strategies.js"></script><script src="/psychology.js"></script><script src="/trading-engine.js"></script><script src="/options-paper.js"></script><script src="/setup.js"></script><script src="/learning.js"></script><script src="/book-learning.js"></script>
+<script src="/app.js"></script><script src="/backtest-strategies.js"></script><script src="/psychology.js"></script><script src="/trading-engine.js"></script><script src="/options-paper.js"></script><script src="/setup.js"></script><script src="/learning.js"></script>
 </body></html>
