@@ -70,7 +70,7 @@ const state={capital:Number(process.env.PAPER_CAPITAL||100000),riskPct:0.5,daily
 function rollDay(){const d=new Date().toISOString().slice(0,10);if(d!==state.day){state.day=d;state.locked=false;}}
 export function paperStatus(){
   rollDay();const today=state.trades.filter(t=>t.day===state.day),pnl=today.reduce((s,t)=>s+t.pnl,0);
-  return {mode:"paper",liveOrdersEnabled:false,capital:state.capital,riskPct:state.riskPct,dailyLossLimit:state.capital*state.dailyLossPct/100,realizedPnlToday:pnl,tradesToday:today.length,openPositions:state.open,locked:state.locked};
+  return {mode:"paper",liveOrdersEnabled:false,capital:state.capital,riskPct:state.riskPct,dailyLossLimit:state.capital*state.dailyLossPct/100,realizedPnlToday:pnl,tradesToday:today.length,openPositions:state.open,locked:state.locked,history:state.trades.slice(-500)};
 }
 export function autoPaperTrade(a){
   rollDay();const st=paperStatus();
@@ -81,7 +81,7 @@ export function autoPaperTrade(a){
   const riskCash=state.capital*state.riskPct/100,qty=Math.floor(riskCash/a.plan.stopDistance);
   if(!Number.isFinite(qty)||qty<1)return {executed:false,reason:"Calculated quantity below one unit",analysis:a,status:st};
   if(qty*a.plan.entry>state.capital*10)return {executed:false,reason:"Position notional exceeds 10x paper capital exposure cap",analysis:a,status:st};
-  const p={id:"PAPER-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),day:state.day,market:a.market,direction:a.signal,entry:a.plan.entry,stopLoss:a.plan.stopLoss,target:a.plan.target,quantity:qty,riskCash:qty*a.plan.stopDistance,openedAt:Date.now()};
+  const p={id:"PAPER-"+Date.now()+"-"+Math.random().toString(36).slice(2,7),day:state.day,market:a.market,direction:a.signal,entry:a.plan.entry,stopLoss:a.plan.stopLoss,target:a.plan.target,quantity:qty,riskCash:qty*a.plan.stopDistance,openedAt:Date.now(),source:"technical_lab",strategyId:a.strategyId||a.strategy?.id||("technical_lab_"+a.signal),marketRegime:a.regime||a.marketRegime||"mixed",timeframe:a.timeframe||a.interval||"unknown",entryReason:a.reason||a.explanation||null};
   state.open.push(p);state.trades.push({...p,pnl:0,status:"open"});return {executed:true,order:p,status:paperStatus()};
 }
 export function markPaperPosition(market,price){

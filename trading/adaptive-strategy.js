@@ -24,10 +24,12 @@ export function learnFromClosedTrades(policy={},trades=[]) {
 export function scoreAdaptiveCandidate(candidate,policy={},market={}) {
   const setup=classifySetup(candidate,market),s=policy?.stats?.[keyOf(setup.strategyId,setup.regime)];
   const n=s?.trades||0,winRate=n?s.wins/n:0.5;
+  const historicalAdjustment=Number(policy?.historicalEvidence?.adjustments?.[setup.strategyId]||0);
   // Shrink small samples toward neutral; never allow past P&L to override liquidity/risk gates.
   const evidenceWeight=Math.min(1,n/20),experienceAdjustment=clamp((winRate-0.5)*20*evidenceWeight,-5,5);
   const base=Number(candidate.volatilityScore||0);
-  return {...candidate,...setup,adaptiveScore:Number((base+experienceAdjustment).toFixed(2)),
+  return {...candidate,...setup,adaptiveScore:Number((base+experienceAdjustment+historicalAdjustment).toFixed(2)),
+    historicalAdjustment,
     experience:{trades:n,winRatePct:n?Number((winRate*100).toFixed(1)):null,netPnl:s?.netPnl??0,adjustment:Number(experienceAdjustment.toFixed(2)),status:n<20?"exploring":"experience_adjusted"}};
 }
 export function selectAdaptiveCandidate(candidates=[],policy={},market={}) {

@@ -367,10 +367,39 @@ app.get("/api/setup/checks", async (_req, res) => {
   }
   res.json({ checks, ready: checks.render.ok && checks.supabase.ok && checks.upstox.ok, checkedAt: new Date().toISOString() });
 });
+app.post("/api/learning/sync", async (req, res) => {
+  try {
+    const db = await readSupabaseExperiment();
+    const a = db.payload.autopilot || (db.payload.autopilot = {});
+    const existing = Array.isArray(db.payload.appTradeJournal) ? db.payload.appTradeJournal : [];
+    const optionsTrades = optionsPaperStatus().history || [];
+    const technicalTrades = paperStatus().history || [];
+    const browserTrades = Array.isArray(req.body?.trades) ? req.body.trades.slice(-500).map(t => ({...t, source:"manual_practice", status:"planned", pnl:null, strategyId:t.strategyId||"unclassified"})) : [];
+    const incoming = [
+      ...optionsTrades.map(t => ({...t, source:t.source||"manual_options"})),
+      ...technicalTrades.map(t => ({...t, source:t.source||"technical_lab"})),
+      ...browserTrades.map(t => ({...t, source:t.source||"manual_practice"}))
+    ];
+    const byId = new Map(existing.map(t => [String(t.sourceTradeId || (t.source+":"+t.id)), t]));
+    for (const t of incoming) {
+      if (!t || !t.id) continue;
+      const source = String(t.source || "app_paper");
+      const key = source + ":" + String(t.id);
+      byId.set(key, {...byId.get(key), ...t, id:key, source, sourceTradeId:key});
+    }
+    db.payload.appTradeJournal = [...byId.values()].slice(-2000);
+    a.appLearningSyncAt = Date.now();
+    a.appLearningTradeCount = db.payload.appTradeJournal.length;
+    db.payload.autopilot = a;
+    await writeSupabaseExperiment(db.base, db.key, db.payload);
+    const closed = db.payload.appTradeJournal.filter(t => t.status && !["open","planned"].includes(t.status) && Number.isFinite(Number(t.pnl)));
+    res.json({ok:true, synced:incoming.length, journalTrades:db.payload.appTradeJournal.length, closedTrades:closed.length, sources:{options:optionsTrades.length,technical:technicalTrades.length,browser:browserTrades.length}, syncedAt:a.appLearningSyncAt});
+  } catch (e) { res.status(503).json({error:e.message}); }
+});
 app.get("/api/autopilot/status", async (_req, res) => {
   try {
     const db = await readSupabaseExperiment(), a = db.payload.autopilot || {};
-    res.json({ ...summarizeExperiment(a), nightLearning: a.nightLearning || null, authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions", watchlistCount: a.universeCount || 0, batchSize: 10, scanIntervalMs: 300000 });
+    res.json({ ...summarizeExperiment(a), adaptiveDecision:a.adaptiveDecision||null, adaptivePolicy:a.adaptivePolicy||null, appLearning:{syncedAt:a.appLearningSyncAt||null,journalTrades:a.appLearningTradeCount||0}, nightLearning: a.nightLearning || null, authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions", watchlistCount: a.universeCount || 0, batchSize: 10, scanIntervalMs: 300000 });
   } catch (e) { res.status(503).json({ error: e.message, storage: "not_configured" }); }
 });
 app.post("/api/autopilot/start", async (_req, res) => {

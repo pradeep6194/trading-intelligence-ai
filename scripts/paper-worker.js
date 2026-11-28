@@ -163,6 +163,7 @@ const { recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotE
 const { classifyMarketEvidence, resolveForwardOutcome } = await import("../trading/market-learning.js");
 const { evaluateIntelligenceSuite } = await import("../trading/intelligence-suite.js");
 const { learnFromClosedTrades, selectAdaptiveCandidate } = await import("../trading/adaptive-strategy.js");
+const { buildUnifiedLearningInput } = await import("../trading/unified-learning.js");
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
@@ -177,7 +178,10 @@ try {
   payload.autopilot.universeCount = universe.length;
   fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
   const day = indiaDate(), best = [];
-  payload.autopilot.adaptivePolicy = learnFromClosedTrades(payload.autopilot.adaptivePolicy || {}, payload.autopilot.trades || []);
+  const unifiedLearning = buildUnifiedLearningInput(payload);
+  payload.autopilot.adaptivePolicy ||= {};
+  payload.autopilot.adaptivePolicy.historicalEvidence = unifiedLearning.historical;
+  payload.autopilot.adaptivePolicy = learnFromClosedTrades(payload.autopilot.adaptivePolicy, unifiedLearning.trades);
   const marketUniverse = await discoverMarketUniverse();
   const research = await collectResearch(batch, token, payload.autopilot.latestResearch, marketUniverse);
   payload.autopilot.latestResearch = research;
@@ -239,7 +243,7 @@ try {
   }
   const adaptive = selectAdaptiveCandidate(best, payload.autopilot.adaptivePolicy, { spotChangePct: best[0]?.analysis?.drivers?.find(d => d.factor === "spot momentum") ? Number(best[0].analysis.drivers.find(d => d.factor === "spot momentum").observation.match(/[-+]?\\d+(?:\\.\\d+)?/)?.[0]) : 0 });
   const candidate = adaptive.ranked.find(x => !hasEnteredUnderlyingToday(x.underlyingKey, day)) || null;
-  payload.autopilot.adaptiveDecision = { at: Date.now(), policyVersion: adaptive.policyVersion, selectedStrategy: candidate?.strategyId || null, selectedRegime: candidate?.regime || null, ranked: adaptive.ranked.slice(0,5).map(x => ({symbol:x.symbol,strategyId:x.strategyId,regime:x.regime,baseScore:x.volatilityScore,adaptiveScore:x.adaptiveScore,experience:x.experience})), reason: adaptive.reason };
+  payload.autopilot.adaptiveDecision = { at: Date.now(), policyVersion: adaptive.policyVersion, selectedStrategy: candidate?.strategyId || null, selectedRegime: candidate?.regime || null, ranked: adaptive.ranked.slice(0,5).map(x => ({symbol:x.symbol,strategyId:x.strategyId,regime:x.regime,baseScore:x.volatilityScore,adaptiveScore:x.adaptiveScore,historicalAdjustment:x.historicalAdjustment,experience:x.experience})), reason: adaptive.reason + " Historical 1m/1D index-proxy evidence is a capped prior; closed app paper trades drive realised-outcome learning." };
   if (candidate) {
     const opened = openOptionsPaper(candidate);
     if (opened.opened) {
@@ -250,7 +254,7 @@ try {
         entry: opened.position.entry, quantity: opened.position.quantity, lots: opened.position.lots,
         stop: opened.position.stop, target: opened.position.target, score: candidate.volatilityScore,
         changePct: candidate.changePct, iv: candidate.iv, volume: candidate.volume, oi: candidate.oi, spreadPct: candidate.spreadPct,
-        strategyId: candidate.strategyId, strategyVersion: 1, marketRegime: candidate.regime, strategyFeatures: candidate.features, experienceAtEntry: candidate.experience, adaptiveScore: candidate.adaptiveScore,
+        strategyId: candidate.strategyId, strategyVersion: 1, marketRegime: candidate.regime, strategyFeatures: candidate.features, experienceAtEntry: candidate.experience, adaptiveScore: candidate.adaptiveScore, historicalAdjustment: candidate.historicalAdjustment, timeframe: "intraday_option", source: "autopilot",
         reasons: ["Adaptive strategy: " + candidate.strategyId, "Market regime: " + candidate.regime, "Base scanner and liquidity gates passed", "Experience adjustment is sample-shrunk; risk controls remain unchanged", "One entry per underlying per Indian market day"],
         intelligence: candidate.intelligence || null
       });
@@ -275,7 +279,7 @@ try {
   payload = JSON.parse(fs.readFileSync(dataFile, "utf8"));
   payload.autopilot.lastError = null;
   payload.autopilot.lastWorkerAt = Date.now();
-  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate), adaptiveStrategy: candidate?.strategyId || null, adaptiveRegime: candidate?.regime || null, learnedTrades: payload.autopilot.adaptivePolicy?.lastLearning?.totalLearned || 0, researchFeeds: research.feedStatus };
+  payload.autopilot.lastWorkerResult = { scannedUnderlyings: batch.length, universeCount: universe.length, candidateCount: best.length, openedTrade: Boolean(candidate), adaptiveStrategy: candidate?.strategyId || null, adaptiveRegime: candidate?.regime || null, learnedTrades: payload.autopilot.adaptivePolicy?.lastLearning?.totalLearned || 0, learningCoverage: unifiedLearning.coverage, historicalEvidence: unifiedLearning.historical, researchFeeds: research.feedStatus };
   await dbWrite(payload);
   console.log("Paper scan completed:", JSON.stringify(payload.autopilot.lastWorkerResult));
 } catch (error) {

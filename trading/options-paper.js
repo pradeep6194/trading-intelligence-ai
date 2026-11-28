@@ -99,6 +99,7 @@ export function openOptionsPaper(candidate) {
   const lots = Math.floor(riskBudget / riskPerLot);
   if (lots < 1) return { opened: false, reason: "One lot exceeds the 0.5% paper risk budget. Increase virtual capital or select a lower-premium contract.", status };
   const position = {
+    source: candidate.source || "manual_options", strategyId: candidate.strategyId || (Math.abs(Number(candidate.changePct||0))>=5 ? "premium_expansion" : "liquidity_first"), marketRegime: candidate.regime || "mixed", timeframe: candidate.timeframe || "intraday_option", entryReason: candidate.reasons?.join("; ") || "Manual option-chain selection",
     id: "OPT-PAPER-" + Date.now() + "-" + Math.random().toString(36).slice(2,7),
     day: state.day, instrumentKey: candidate.instrumentKey, symbol: candidate.symbol, underlyingKey: candidate.underlyingKey,
     expiry: candidate.expiry, side: candidate.side, strike: candidate.strike, lotSize, lots, quantity: lotSize * lots,
