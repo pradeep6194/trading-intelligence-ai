@@ -6,3 +6,6 @@ function candles(n=180){const rows=[];let p=100;for(let i=0;i<n;i++){p+=Math.sin
 test("historical analysis requires real minimum history",()=>{const r=analyseHistoricalMarket(candles(20));assert.equal(r.status,"insufficient_history");});
 test("historical analysis produces separate chronological train and OOS diagnostics",()=>{const r=analyseHistoricalMarket(candles());assert.equal(r.status,"available");assert.ok(r.backtests[0].train);assert.ok(r.backtests[0].outOfSample);assert.match(r.backtests[0].entry,/Next daily close/);});
 test("night report exposes attributed external research library and guardrails",()=>{const r=buildNightLearningReport({markets:{}});assert.ok(RESEARCH_LIBRARY.length>=6);assert.equal(r.status,"research_library_only");assert.ok(r.guardrails.length>=3);});
+
+import { analyseAdvancedHistoricalMarket } from "./advanced-historical-learning.js";
+test("advanced learning engine has three strategies and regime-aware walk-forward tests",()=>{const r=analyseAdvancedHistoricalMarket(candles(260));assert.equal(r.status,"available");assert.equal(Object.keys(r.strategies).length,3);assert.ok(r.walkForward.noRandomShuffle);});
