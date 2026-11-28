@@ -133,7 +133,8 @@ async function scanUnderlying(key, rankOptionChain) {
   const callOiChange = callOi - calls.previousOi, putOiChange = putOi - puts.previousOi;
   const spot = Number(chain[0]?.underlying_spot_price || 0);
   const pcr = Number(chain[0]?.pcr || (callOi > 0 ? putOi / callOi : 0));
-  return { expiry, spot, pcr, callOi, putOi, callOiChange, putOiChange, ...ranked };
+  const snapshotRows = buildOptionGreekSnapshotRows(chain, key, expiry, new Date().toISOString());
+  return { expiry, spot, pcr, callOi, putOi, callOiChange, putOiChange, snapshotRows, ...ranked };
 }
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "trading-intelligence-"));
 process.env.DATA_DIR = dataDir;
@@ -164,6 +165,9 @@ const { classifyMarketEvidence, resolveForwardOutcome } = await import("../tradi
 const { evaluateIntelligenceSuite } = await import("../trading/intelligence-suite.js");
 const { learnFromClosedTrades, selectAdaptiveCandidate } = await import("../trading/adaptive-strategy.js");
 const { buildUnifiedLearningInput } = await import("../trading/unified-learning.js");
+const { buildOptionGreekSnapshotRows, persistOptionGreekSnapshots } = await import("../trading/options-archive.js");
+const benchmarkKeys = new Set(["NSE_INDEX|Nifty 50", "NSE_INDEX|Nifty Bank"]);
+let archiveWarningShown = false;
 try {
   const universe = await discoverUniverse();
   const batchSize = Math.max(1, Number(process.env.PAPER_SCAN_BATCH_SIZE || 10));
@@ -189,6 +193,17 @@ try {
   for (const underlyingKey of batch) {
     try {
       const result = await scanUnderlying(underlyingKey, rankOptionChain);
+      if (benchmarkKeys.has(underlyingKey) && result.snapshotRows?.length) {
+        try {
+          const archived = await persistOptionGreekSnapshots(result.snapshotRows, { supabaseUrl, serviceKey });
+          console.log("Option Greeks snapshots archived:", underlyingKey, archived.saved);
+        } catch (archiveError) {
+          if (!archiveWarningShown) {
+            console.warn("Option Greeks archive unavailable; paper scan will continue. Apply supabase/migrations/20261128_option_greek_snapshots.sql in Supabase SQL Editor. Details:", archiveError.message);
+            archiveWarningShown = true;
+          }
+        }
+      }
       const top = result.candidates[0] || null;
       const stored = JSON.parse(fs.readFileSync(dataFile, "utf8"));
       stored.autopilot ||= {};
