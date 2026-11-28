@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {collectAttributableTrades,buildHistoricalEvidence,buildUnifiedLearningInput} from "./unified-learning.js";
+import {collectAttributableTrades,buildHistoricalEvidence,buildUnifiedLearningInput} from "./unified-learning.js";\nimport {scoreAdaptiveCandidate} from "./adaptive-strategy.js";
 test("collects closed outcomes from autopilot, manual options and app journal; excludes open and plans",()=>{
  const x=collectAttributableTrades({autopilot:{trades:[{id:"a",status:"target_hit",pnl:100,strategyId:"momentum_confirmation"}]},optionsPaper:{trades:[{id:"b",status:"stopped",pnl:-30}]},appTradeJournal:[{id:"c",status:"closed",pnl:20},{id:"d",status:"open",pnl:0},{id:"e",status:"planned"}]});
  assert.deepEqual(x.map(t=>t.id).sort(),["a","b","c"]);assert.equal(x.find(t=>t.id==="b").source,"manual_options");assert.equal(x.find(t=>t.id==="c").strategyId,"unclassified");
@@ -18,3 +18,4 @@ test("negative OOS or inadequate sample cannot contribute historical prior",()=>
  const h=buildHistoricalEvidence({minuteStudies:{N:{strategies:{ema_9_21:{status:"research_ready",validation:{trades:15,expectancyPct:0.2},outOfSample:{trades:50,expectancyPct:-0.1,maxDrawdownPct:5}}}}}});
  assert.equal(h.adjustments.momentum_confirmation,0);
 });
+\ntest("historical evidence contributes only a capped prior to next candidate ranking",()=>{\n const candidate={side:"CE",changePct:6,volatilityScore:80,spreadPct:1,volume:5000,oi:20000};\n const scored=scoreAdaptiveCandidate(candidate,{historicalEvidence:{adjustments:{premium_expansion:2}}},{spotChangePct:0});\n assert.equal(scored.historicalAdjustment,2);assert.equal(scored.adaptiveScore,82);\n});\n
