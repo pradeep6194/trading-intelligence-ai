@@ -17,7 +17,7 @@ export function buildOptionGreekSnapshotRows(chain, underlyingKey, expiry, snaps
       rows.push({
         snapshot_at: snapshotAt,
         underlying_key: underlyingKey,
-        expiry,
+        expiry_date: expiry,
         instrument_key: instrumentKey,
         option_type: side,
         strike: finite(strikeRow.strike_price),
