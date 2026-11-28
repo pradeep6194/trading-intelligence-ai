@@ -174,3 +174,18 @@ footer{line-height:1.6}
 .ahl-sources summary{cursor:pointer;color:var(--gold);font-weight:700}
 .ahl-sources p{color:var(--muted);line-height:1.5}
 @media(max-width:600px){.ahl-shell{padding:13px;margin:12px 0}.ahl-summary{grid-template-columns:1fr 1fr}.ahl-summary>div:first-child{grid-column:1/-1}.ahl-findings{grid-template-columns:1fr 1fr}.ahl-metric-grid{grid-template-columns:1fr}.ahl-metric{display:grid;grid-template-columns:1fr 1fr;column-gap:8px}.ahl-metric small{grid-column:1/-1}.ahl-strategy-head{align-items:flex-start}.ahl-header h3{font-size:18px}}
+
+/* Evidence-gated strategy comparison */
+.ahl-comparison{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:11px;background:#ffffff04;min-width:0}
+.ahl-comparison-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ahl-comparison-head h5{margin:0;font-size:13px}
+.ahl-comparison-head span{font-size:10px;color:var(--gold)}
+.ahl-gate{font-size:10px;color:var(--muted);line-height:1.6}
+.ahl-rank-list{padding-left:22px;margin:10px 0}
+.ahl-rank-list li{padding:8px 0;border-bottom:1px solid var(--line)}
+.ahl-rank-list b,.ahl-rank-list span{display:block;font-size:11px}
+.ahl-rank-list span{color:var(--muted);margin-top:4px;line-height:1.5}
+.ahl-no-rank{font-size:12px;color:var(--muted);padding:10px;background:#ffffff05;border-radius:8px}
+.ahl-weak{font-size:11px;color:var(--muted);margin-top:10px}
+.ahl-weak summary{cursor:pointer;color:var(--gold)}
+.ahl-weak p{line-height:1.5;overflow-wrap:anywhere}
