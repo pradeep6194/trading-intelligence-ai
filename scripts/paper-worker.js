@@ -155,7 +155,18 @@ if (Date.now() >= startedAt + 90 * 24 * 60 * 60 * 1000) {
 }
 const clock = marketClock();
 if (["Sat", "Sun"].includes(clock.weekday) || clock.minutes < 555 || clock.minutes > 930) {
-  console.log("Outside NSE market hours; no scan executed.");
+  const reason = ["Sat", "Sun"].includes(clock.weekday)
+    ? "Weekend: exchange is closed; live option-chain quotes are not refreshed."
+    : "Outside NSE market hours: live option-chain quotes are not refreshed.";
+  payload.autopilot.lastWorkerAt = Date.now();
+  payload.autopilot.lastWorkerResult = {
+    status: "market_closed",
+    scannedUnderlyings: 0,
+    note: reason,
+    nextAction: "Hourly Night Learning Engine continues historical research and learning."
+  };
+  await dbWrite(payload);
+  console.log("Paper worker heartbeat:", JSON.stringify(payload.autopilot.lastWorkerResult));
   process.exit(0);
 }
 fs.writeFileSync(dataFile, JSON.stringify(payload), { mode: 0o600 });
