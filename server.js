@@ -335,7 +335,7 @@ function summarizeExperiment(a = {}) {
     realizedPnl: Number(pnl.toFixed(2)),
     learningSummary: [...groups.values()].map(g => ({ ...g, winRate: Number((g.wins / g.trades * 100).toFixed(1)), averagePnl: Number((g.pnl / g.trades).toFixed(2)), pnl: Number(g.pnl.toFixed(2)) })),
     observations: (a.observations || []).slice(-20).reverse(),
-    recentScans: (a.scans || []).slice(-10).reverse(), recentTrades: trades.slice(-50).reverse()
+    recentScans: (a.scans || []).slice(-10).reverse(), recentTrades: trades.slice(-50).reverse(), adaptiveDecision: a.adaptiveDecision || null, adaptiveStats: a.adaptivePolicy?.stats || {}, learnedTradeCount: a.adaptivePolicy?.lastLearning?.totalLearned || 0, openTradeCount: trades.filter(t => t.status === "open").length, lastWorkerResult: a.lastWorkerResult || null
   };
 }
 app.get("/api/setup/checks", async (_req, res) => {
