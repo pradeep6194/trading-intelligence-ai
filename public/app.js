@@ -25,8 +25,15 @@ const lessons={
 "options":"Options Greeks premium की sensitivity समझाते हैं, भविष्य की गारंटी नहीं देते। Delta बताता है कि underlying में छोटे बदलाव पर option premium कितना बदल सकता है। Gamma, Delta के बदलाव की दर है। Theta समय बीतने से premium पर असर बताता है। Vega implied volatility बदलने पर premium की sensitivity बताता है। Short options में expiry, gap और तेज volatility के दौरान बड़ा नुकसान हो सकता है। किसी भी trade से पहले defined-risk strategy और maximum loss समझें।",
 "position":"Cash instrument के लिए प्रति unit planned risk = entry और stop-loss का absolute अंतर। Risk budget = capital × risk percentage। Quantity = floor(risk budget ÷ प्रति unit risk)। उदाहरण: ₹50,000 capital का 0.5% = ₹250 risk budget। Entry ₹250 और stop ₹245 हो तो प्रति share risk ₹5 है; गणित के अनुसार quantity 50 shares होगी, charges और slippage से पहले। Futures और options में lot size, margin, gap risk और contract multiplier भी जाँचना ज़रूरी है।"
 };
-function coachAnswer(q){const s=q.toLowerCase();let key=s.includes("liquid")||s.includes("sweep")?"liquidity":s.includes("option")||s.includes("greek")||s.includes("theta")||s.includes("vega")?"options":s.includes("risk")||s.includes("size")||s.includes("quantity")||s.includes("stop")?"position":"market structure";const live=Object.values(latestMarket).map(t=>t.key+": "+Number(t.ltp).toLocaleString("en-IN")).join(" | ");const context=live?"\n\nLive feed se latest tick: "+live+".":"\n\nAbhi live tick available nahi hai; main market direction ka daava nahi karunga.";return lessons[key]+context+"\n\nHindi mein yaad rakhein: context → confirmation → invalidation → risk. Yeh shiksha hai, buy/sell call nahi.";}
-function addBubble(who,text){const div=document.createElement("div");div.className="bubble "+(who==="Coach"?"coach":"");div.innerHTML=`<b>${who}</b><p>${esc(text).replace(/\n/g,"<br>")}</p>`;$("#chat").appendChild(div);$("#chat").scrollTop=$("#chat").scrollHeight}
+function coachAnswer(q){const s=q.toLowerCase();let key=s.includes("liquid")||s.includes("sweep")?"liquidity":s.includes("option")||s.includes("greek")||s.includes("theta")||s.includes("vega")?"options":s.includes("risk")||s.includes("size")||s.includes("quantity")||s.includes("stop")?"position":"market structure";const live=Object.values(latestMarket).map(t=>t.key+": "+Number(t.ltp).toLocaleString("en-IN")).join(" | ");const context=live?"
+
+Live feed se latest tick: "+live+".":"
+
+Abhi live tick available nahi hai; main market direction ka daava nahi karunga.";return lessons[key]+context+"
+
+Hindi mein yaad rakhein: context → confirmation → invalidation → risk. Yeh shiksha hai, buy/sell call nahi.";}
+function addBubble(who,text){const div=document.createElement("div");div.className="bubble "+(who==="Coach"?"coach":"");div.innerHTML=`<b>${who}</b><p>${esc(text).replace(/
+/g,"<br>")}</p>`;$("#chat").appendChild(div);$("#chat").scrollTop=$("#chat").scrollHeight}
 function ask(q){if(!q.trim())return;addBubble("You",q);addBubble("Coach",coachAnswer(q));}
 $("#askForm").onsubmit=e=>{e.preventDefault();const q=$("#question").value;$("#question").value="";ask(q)};
 $$("[data-prompt]").forEach(b=>b.onclick=()=>ask(b.dataset.prompt));
@@ -35,7 +42,8 @@ function riskCalc(){const cap=Number($("#riskCapital").value)||0,pct=Number($("#
 function preview(){const en=Number($("#entry").value),st=Number($("#stop").value),qty=Number($("#qty").value)||0;const r=Math.abs(en-st)*qty;$("#riskPreview").textContent=en>0&&st>0&&en!==st?`Planned risk: ${money(r)} (${(r/50000*100).toFixed(2)}% of starting capital). Verify quantity, tick size and instrument lot rules.`:"Enter entry and stop to calculate planned risk."}["entry","stop","qty"].forEach(id=>$("#"+id).addEventListener("input",preview));
 $("#tradeForm").onsubmit=e=>{e.preventDefault();const symbol=$("#symbol").value.trim(),side=$("#side").value,qty=Number($("#qty").value),entry=Number($("#entry").value),stop=Number($("#stop").value),target=Number($("#target").value);if(!symbol||qty<1||entry<=0||stop<=0||entry===stop)return alert("Enter valid instrument, quantity, entry and a different stop price.");const risk=Math.abs(entry-stop)*qty;if(risk>state.cash)return alert("Planned risk exceeds your available virtual cash. Reduce quantity or review your stop.");state.trades.push({id:"practice-"+Date.now(),source:"manual_practice",status:"planned",strategyId:"unclassified",timeframe:"unspecified",symbol,side,qty,entry,stop,target,risk,date:new Date().toLocaleDateString("en-IN")});save();syncLearningTrades();e.target.reset();$("#symbol").value="NIFTY 50";$("#qty").value=1;preview();alert("Paper trade plan recorded. No broker order was placed.")};
 $("#clearTrades").onclick=()=>{if(confirm("Reset all paper trades and restore ₹50,000 virtual cash?")){state={cash:50000,realised:0,trades:[]};save()}};
-async function syncLearningTrades(){try{const trades=state.trades.map((t,i)=>({...t,id:t.id||["practice",t.symbol,t.date,t.entry,t.qty,i].join("-"),source:"manual_practice",status:t.status||"planned",strategyId:t.strategyId||"unclassified",timeframe:t.timeframe||"unspecified"}));await fetch("/api/learning/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({trades})});}catch(e){console.warn("Learning sync unavailable:",e.message);}}\nrenderAccount();status();if(new URLSearchParams(location.search).has("connected"))syncLearningTrades();history.replaceState({}, "", "/");
+async function syncLearningTrades(){try{const trades=state.trades.map((t,i)=>({...t,id:t.id||["practice",t.symbol,t.date,t.entry,t.qty,i].join("-"),source:"manual_practice",status:t.status||"planned",strategyId:t.strategyId||"unclassified",timeframe:t.timeframe||"unspecified"}));await fetch("/api/learning/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({trades})});}catch(e){console.warn("Learning sync unavailable:",e.message);}}
+renderAccount();status();if(new URLSearchParams(location.search).has("connected"))syncLearningTrades();history.replaceState({}, "", "/");
 
 
 function fmtNum(v){return Number(v||0).toLocaleString("en-IN",{maximumFractionDigits:2})}
@@ -113,7 +121,8 @@ async function runBacktest(){
   $("#btCountLabel").textContent=trades.length+" CLOSED TRADES";drawBt(curve);
   msg.textContent="Verified Upstox historical candles · "+candles.length+" candles · "+from+" to "+to+". Rupee P&L uses "+qty+" unit(s); ₹"+fixedCost+" estimated round-trip charges per completed trade. Taxes/slippage may vary.";
  }catch(e){
-  if(msg)msg.textContent=e.message+" ["+(e.stack||"").split("\\n")[1]?.trim()+"]";$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';
+  if(msg)msg.textContent=e.message+" ["+(e.stack||"").split("\
+")[1]?.trim()+"]";$("#btRows").innerHTML='<tr><td colspan="7" class="history-empty">'+esc(e.message)+'</td></tr>';
   ["btNet","btWin","btTrades","btPf","btDd","btAvg","btAvgWin","btAvgLoss","btExpectancy","btCharges"].forEach(id=>{if($("#"+id))$("#"+id).textContent="—";});drawBt([]);
  }
 }
