@@ -12,3 +12,15 @@ test("advanced learning engine has three strategies and regime-aware walk-forwar
 
 test("strategy comparison withholds ranking below evidence thresholds",()=>{const r=compareStrategyResults({strategies:{sma_trend:{outOfSample:{trades:2,expectancyPct:4,profitFactor:2,maxDrawdownPct:2},validation:{trades:1,expectancyPct:2}}}});assert.equal(r.ranked.length,0);assert.equal(r.weak[0].status,"not_rankable");});
 test("strategy comparison ranks only sufficiently sampled strategies with positive validation and OOS metrics",()=>{const r=compareStrategyResults({strategies:{good:{name:"Good",validation:{trades:12,expectancyPct:0.2},outOfSample:{trades:25,expectancyPct:0.3,profitFactor:1.5,maxDrawdownPct:8}},weak:{validation:{trades:12,expectancyPct:-0.1},outOfSample:{trades:30,expectancyPct:-0.2,profitFactor:0.8,maxDrawdownPct:18}}}});assert.equal(r.ranked.length,1);assert.equal(r.ranked[0].id,"good");assert.equal(r.ranked[0].rank,1);assert.ok(r.weak[0].reasons.includes("non_positive_oos_expectancy"));});
+
+test("historical simulations expose trade-level fills, cost assumptions and a buy-and-hold benchmark",()=>{
+  const r=analyseAdvancedHistoricalMarket(candles(900));
+  assert.equal(r.status,"available");
+  assert.equal(r.timeframe,"1D");
+  assert.ok(r.costAssumption.roundTripPct>0);
+  assert.ok(r.buyHoldBenchmark && Number.isFinite(r.buyHoldBenchmark.netReturnPct));
+  const s=r.strategies.sma_trend;
+  assert.ok(s && s.train && s.validation && s.outOfSample);
+  assert.ok(Array.isArray(s.trades));
+  if(s.trades.length){const t=s.trades.at(-1);assert.ok(t.entryAt&&t.exitAt);assert.ok(Number.isFinite(t.entryPrice));assert.ok(Number.isFinite(t.exitPrice));assert.ok(Number.isFinite(t.netPct));}
+});
