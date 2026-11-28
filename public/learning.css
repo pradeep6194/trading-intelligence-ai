@@ -43,3 +43,14 @@
 .ahl-trade-scroll table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
 .ahl-trade-scroll th,.ahl-trade-scroll td{padding:7px 8px;text-align:left;border-bottom:1px solid var(--line,#29364b)}
 @media(max-width:650px){.book-auto-stats{grid-template-columns:1fr 1fr}.ahl-metric-grid{grid-template-columns:1fr 1fr}}
+
+.ahl-shell .ahl-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ahl-shell .ahl-metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.ahl-shell .ahl-metric{min-width:0;padding:12px;border-radius:11px;background:rgba(255,255,255,.035)}
+.ahl-shell .ahl-metric small,.ahl-shell .ahl-metric b,.ahl-shell .ahl-metric span{display:block}
+.ahl-shell .ahl-metric small{font-size:10px;color:var(--muted);margin-bottom:8px}
+.ahl-shell .ahl-metric b{font-size:13px;margin-bottom:8px}
+.ahl-shell .ahl-metric span{font-size:11px;line-height:1.65;color:var(--muted);overflow-wrap:anywhere}
+.ahl-shell .ahl-strategy-head span{font-size:10px;color:var(--gold,#d6b46a);text-align:right}
+.ahl-shell .ahl-trade-scroll table{min-width:560px}
+@media(max-width:650px){.ahl-shell .ahl-summary{grid-template-columns:1fr 1fr}.ahl-shell .ahl-metric-grid{grid-template-columns:1fr 1fr}}
