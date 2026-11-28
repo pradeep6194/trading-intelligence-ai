@@ -152,6 +152,7 @@ app.get("/api/candles", async (req, res) => {
 import { analyseMarket, autoPaperTrade, markPaperPosition, paperStatus } from "./trading/engine.js";
 import { rankOptionChain, openOptionsPaper, markOptionsPaper, closeOptionsPaper, optionsPaperStatus } from "./trading/options-paper.js";
 import { getAutopilotStatus, startAutopilot, stopAutopilot, recordScan, recordAutopilotTrade, updateAutopilotTrade, recordAutopilotError, hasEnteredUnderlyingToday, markUnderlyingEnteredToday } from "./trading/autopilot.js";
+import { getBookLearningSession, submitBookAssessment, submitBookTaskEvidence, resetBookChapter } from "./trading/book-learning-engine.js";
 
 async function upstoxJson(url) {
   const response = await fetch(url, { headers: { accept: "application/json", Authorization: "Bearer " + accessToken } });
@@ -464,6 +465,50 @@ app.post("/api/trading/paper/auto", (req, res) => {
 app.post("/api/trading/paper/mark", (req, res) => {
   try { res.json(markPaperPosition(req.body?.market, req.body?.price)); }
   catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+// Book learning API: theory mastery and practical evidence are persisted with the 90-day experiment.
+async function readBookLearningDb() {
+  const db = await readSupabaseExperiment();
+  const a = db.payload.autopilot || {};
+  return { db, a, state: a.bookLearning || {} };
+}
+async function saveBookLearningDb(db, a, state) {
+  a.bookLearning = state;
+  db.payload.autopilot = a;
+  await writeSupabaseExperiment(db.base, db.key, db.payload);
+}
+app.get("/api/book-learning/status", async (_req, res) => {
+  try {
+    const { state } = await readBookLearningDb();
+    res.json(getBookLearningSession(state));
+  } catch (e) { res.status(503).json({ error: e.message, storage: "unavailable" }); }
+});
+app.post("/api/book-learning/assessment", async (req, res) => {
+  try {
+    const { db, a, state } = await readBookLearningDb();
+    const result = submitBookAssessment(state, req.body?.answers);
+    await saveBookLearningDb(db, a, result.state);
+    const { state: _saved, ...publicResult } = result;
+    res.json({ ...publicResult, session: getBookLearningSession(result.state) });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/book-learning/task", async (req, res) => {
+  try {
+    const { db, a, state } = await readBookLearningDb();
+    const result = submitBookTaskEvidence(state, req.body?.evidence);
+    await saveBookLearningDb(db, a, result.state);
+    const { state: _saved, ...publicResult } = result;
+    res.json({ ...publicResult, session: getBookLearningSession(result.state) });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/book-learning/jump", async (req, res) => {
+  try {
+    const { db, a, state } = await readBookLearningDb();
+    const next = resetBookChapter(state, req.body?.chapter);
+    await saveBookLearningDb(db, a, next);
+    res.json(getBookLearningSession(next));
+  } catch (e) { res.status(400).json({ error: e.message }); }
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true, app: "Trading Intelligence AI", stream: feedStatus }));
