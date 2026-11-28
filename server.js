@@ -374,7 +374,7 @@ app.post("/api/learning/sync", async (req, res) => {
     const existing = Array.isArray(db.payload.appTradeJournal) ? db.payload.appTradeJournal : [];
     const optionsTrades = optionsPaperStatus().history || [];
     const technicalTrades = paperStatus().history || [];
-    const browserTrades = Array.isArray(req.body?.trades) ? req.body.trades.slice(-500).map(t => ({...t, source:"manual_practice", status:"planned", pnl:null, strategyId:t.strategyId||"unclassified"})) : [];
+    const browserTrades = Array.isArray(req.body?.trades) ? req.body.trades.slice(-500).map(t => { const status=["open","closed","planned"].includes(t.status)?t.status:"planned"; const closed=status==="closed"&&Number.isFinite(Number(t.pnl))&&Number(t.exit)>0&&Number(t.closedAt)>0; return {...t,source:"manual_practice",status:closed?"closed":status==="closed"?"open":status,pnl:closed?Number(t.pnl):null,strategyId:t.strategyId||"manual_practice",timeframe:t.timeframe||"user_selected"}; }) : [];
     const incoming = [
       ...optionsTrades.map(t => ({...t, source:t.source||"manual_options"})),
       ...technicalTrades.map(t => ({...t, source:t.source||"technical_lab"})),
