@@ -399,7 +399,7 @@ app.post("/api/learning/sync", async (req, res) => {
 app.get("/api/autopilot/status", async (_req, res) => {
   try {
     const db = await readSupabaseExperiment(), a = db.payload.autopilot || {};
-    res.json({ ...summarizeExperiment(a), nightLearning: a.nightLearning || null, authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions", watchlistCount: a.universeCount || 0, batchSize: 10, scanIntervalMs: 300000 });
+    res.json({ ...summarizeExperiment(a), adaptiveDecision:a.adaptiveDecision||null, adaptivePolicy:a.adaptivePolicy||null, appLearning:{syncedAt:a.appLearningSyncAt||null,journalTrades:a.appLearningTradeCount||0}, nightLearning: a.nightLearning || null, authMode: process.env.UPSTOX_ANALYTICS_TOKEN ? "analytics_token" : "disconnected", storage: "supabase", worker: "github-actions", watchlistCount: a.universeCount || 0, batchSize: 10, scanIntervalMs: 300000 });
   } catch (e) { res.status(503).json({ error: e.message, storage: "not_configured" }); }
 });
 app.post("/api/autopilot/start", async (_req, res) => {
