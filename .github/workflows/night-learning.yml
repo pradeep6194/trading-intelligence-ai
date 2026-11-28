@@ -1,0 +1,23 @@
+name: Night Learning Engine
+on:
+  schedule:
+    - cron: "30 12 * * 1-5"
+  workflow_dispatch:
+concurrency:
+  group: trading-intelligence-night-learning
+  cancel-in-progress: false
+jobs:
+  night-research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run historical research and learning report
+        env:
+          UPSTOX_ANALYTICS_TOKEN: ${{ secrets.UPSTOX_ANALYTICS_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/night-learning-worker.js
