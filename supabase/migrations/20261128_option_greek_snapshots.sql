@@ -1,7 +1,7 @@
 create table if not exists public.option_greek_snapshots (
   snapshot_at timestamptz not null,
   underlying_key text not null,
-  expiry date not null,
+  expiry_date date not null,
   instrument_key text not null,
   option_type text not null check (option_type in ('CE','PE')),
   strike numeric not null,
@@ -22,7 +22,7 @@ create table if not exists public.option_greek_snapshots (
 );
 
 create index if not exists option_greek_snapshots_underlying_expiry_time_idx
-  on public.option_greek_snapshots (underlying_key, expiry, snapshot_at desc);
+  on public.option_greek_snapshots (underlying_key, expiry_date, snapshot_at desc);
 create index if not exists option_greek_snapshots_instrument_time_idx
   on public.option_greek_snapshots (instrument_key, snapshot_at desc);
 
